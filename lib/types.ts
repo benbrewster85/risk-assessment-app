@@ -5,7 +5,6 @@ export type Project = {
     team_id: string;
     location_address: string | null;
     location_what3words: string | null;
-    // New Fields:
     scope: string | null;
     author: string | null;
     reviewer: string | null;
@@ -28,20 +27,11 @@ export type RiskAssessmentListItem = {
     created_at: string;
 };
 
-// THIS IS THE TYPE WE ARE UPDATING
 export type RiskAssessment = { 
     id: string; 
     name: string; 
     description: string | null; 
-    project: { 
-        id: string; 
-        name: string; 
-        team_id: string;
-        // The missing properties are now included
-        reference: string | null;
-        location_address: string | null;
-        location_what3words: string | null;
-    } 
+    project: Project;
 };
 
 export type RaEntry = {
@@ -57,6 +47,12 @@ export type RaEntry = {
     control_measures: string | null;
     resultant_likelihood: number;
     resultant_impact: number;
+};
+
+export type Team = {
+    id: string;
+    name: string;
+    logo_url: string | null;
 };
 
 export type TeamMember = {
@@ -89,27 +85,41 @@ export type DynamicRisk = {
     } | null;
 };
 
-export type Team = {
-  id: string;
-  name: string;
-  logo_url: string | null;
-};
-
-
-export type ReportSignatory = {
-    profiles: {
+export type AssetCategory = {
+    id: string;
+    name: string;
+    owner_id: string | null;
+    owner: {
         first_name: string | null;
         last_name: string | null;
-        role: string;
-        id: string; // The user's ID
     } | null;
 };
 
-export type ReportSignature = {
-    signed_at: string;
-    profiles: {
-        first_name: string | null;
-        last_name: string | null;
-        id: string; // The user's ID
+// UPDATED: This type now includes the parent_asset_id
+export type Asset = {
+    id: string;
+    system_id: string;
+    team_id: string;
+    manufacturer: string | null;
+    model: string | null;
+    serial_number: string | null;
+    status: string;
+    created_at: string;
+    category_id: string | null;
+    current_assignee_id: string | null;
+    parent_asset_id: string | null;
+    last_calibrated_date: string | null;
+    calibration_cycle_months: number | null;
+    // Joined data
+    category: { name: string } | null;
+    assignee: { first_name: string | null, last_name: string | null } | null;
+    // UPDATED: parent can now hold more details
+    parent: {
+        id: string;
+        system_id: string;
+        assignee: {
+            first_name: string | null;
+            last_name: string | null;
+        } | null;
     } | null;
 };

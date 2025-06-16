@@ -137,6 +137,24 @@ export default function RiskAssessmentClientPage({
     document.body.removeChild(link);
   };
 
+  const handleSaveAsTemplate = async () => {
+    if (
+      !window.confirm(
+        "Are you sure you want to save a copy of this Risk Assessment as a reusable template?"
+      )
+    )
+      return;
+    const { error } = await supabase.rpc("duplicate_ra_as_template", {
+      p_ra_id: ra.id,
+      p_team_id: ra.project.team_id,
+    });
+    if (error) {
+      toast.error(`Failed to save as template: ${error.message}`);
+    } else {
+      toast.success("Template created successfully!");
+    }
+  };
+
   if (!ra) {
     return <p className="p-8">Loading...</p>;
   }
@@ -186,7 +204,14 @@ export default function RiskAssessmentClientPage({
               </p>
             </div>
             <div className="flex space-x-2 flex-shrink-0">
-              {/* THIS BUTTON/LINK IS NOW RESTORED */}
+              {isCurrentUserAdmin && (
+                <button
+                  onClick={handleSaveAsTemplate}
+                  className="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700"
+                >
+                  Save as Template
+                </button>
+              )}
               <Link
                 href={`/dashboard/ra/${ra.id}/report`}
                 className="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700"

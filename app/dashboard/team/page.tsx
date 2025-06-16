@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { TeamMember, Team } from "@/lib/types";
+import { TeamMember, Team, AssetCategory } from "@/lib/types";
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import LibraryPage from "@/components/LibraryPage";
@@ -17,6 +17,7 @@ export default function TeamPage() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [hazards, setHazards] = useState<{ id: string; name: string }[]>([]);
   const [risks, setRisks] = useState<{ id: string; name: string }[]>([]);
+  const [assetCategories, setAssetCategories] = useState<AssetCategory[]>([]);
 
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -41,39 +42,57 @@ export default function TeamPage() {
           .single();
         if (profileError) {
           console.error("Error fetching profile:", profileError);
+          toast.error("Could not load your profile data.");
           setLoading(false);
           return;
         }
 
-        if (profileData) {
+        if (profileData && profileData.team_id) {
           setCurrentUserRole(profileData.role);
           const teamId = profileData.team_id;
 
-          const [membersResult, hazardsResult, risksResult, teamResult] =
-            await Promise.all([
-              supabase
-                .from("profiles")
-                .select("id, first_name, last_name, role")
-                .eq("team_id", teamId),
-              supabase
-                .from("hazards")
-                .select("id, name")
-                .eq("team_id", teamId)
-                .eq("is_archived", false)
-                .order("name"),
-              supabase
-                .from("risks")
-                .select("id, name")
-                .eq("team_id", teamId)
-                .eq("is_archived", false)
-                .order("name"),
-              supabase.from("teams").select("*").eq("id", teamId).single(),
-            ]);
+          const [
+            membersResult,
+            hazardsResult,
+            risksResult,
+            teamResult,
+            categoriesResult,
+          ] = await Promise.all([
+            supabase
+              .from("profiles")
+              .select("id, first_name, last_name, role")
+              .eq("team_id", teamId),
+            supabase
+              .from("hazards")
+              .select("id, name")
+              .eq("team_id", teamId)
+              .eq("is_archived", false)
+              .order("name"),
+            supabase
+              .from("risks")
+              .select("id, name")
+              .eq("team_id", teamId)
+              .eq("is_archived", false)
+              .order("name"),
+            supabase.from("teams").select("*").eq("id", teamId).single(),
+            supabase
+              .from("asset_categories")
+              .select("*, owner:profiles(first_name, last_name)")
+              .eq("team_id", teamId)
+              .order("name"),
+          ]);
 
           if (membersResult.data) setTeamMembers(membersResult.data);
           if (hazardsResult.data) setHazards(hazardsResult.data);
           if (risksResult.data) setRisks(risksResult.data);
           if (teamResult.data) setTeam(teamResult.data);
+          if (categoriesResult.data) {
+            const transformedCategories = categoriesResult.data.map((c) => ({
+              ...c,
+              owner: Array.isArray(c.owner) ? c.owner[0] : c.owner,
+            }));
+            setAssetCategories(transformedCategories as AssetCategory[]);
+          }
         }
       }
       setLoading(false);
@@ -91,7 +110,11 @@ export default function TeamPage() {
     const response = await fetch("/api/send-invite", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inviteEmail, role: inviteRole, teamId: team.id }),
+      body: JSON.stringify({
+        inviteeEmail: inviteEmail,
+        role: inviteRole,
+        teamId: team.id,
+      }),
     });
     const result = await response.json();
     if (!response.ok) {
@@ -106,6 +129,15 @@ export default function TeamPage() {
   const handleRoleChange = async (userId: string, newRole: string) => {
     if (userId === currentUserId) {
       toast.error("You cannot change your own role.");
+      // Revert the dropdown visually
+      const originalRole = teamMembers.find((m) => m.id === userId)?.role;
+      if (originalRole) {
+        setTeamMembers((currentMembers) =>
+          currentMembers.map((m) =>
+            m.id === userId ? { ...m, role: originalRole } : m
+          )
+        );
+      }
       return;
     }
     const { error } = await supabase
@@ -132,7 +164,6 @@ export default function TeamPage() {
     <div className="p-8">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-4">Team & Library Management</h1>
-
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8" aria-label="Tabs">
             <button
@@ -155,7 +186,6 @@ export default function TeamPage() {
             </button>
           </nav>
         </div>
-
         <div className="mt-8">
           {!isAdmin ? (
             <p className="text-red-600">
@@ -250,11 +280,13 @@ export default function TeamPage() {
                   </div>
                 </>
               )}
-              {activeTab === "library" && (
+              {activeTab === "library" && team && (
                 <LibraryPage
                   hazards={hazards}
                   risks={risks}
-                  teamId={team?.id || null}
+                  assetCategories={assetCategories}
+                  teamMembers={teamMembers}
+                  teamId={team.id}
                 />
               )}
               {activeTab === "settings" && team && (

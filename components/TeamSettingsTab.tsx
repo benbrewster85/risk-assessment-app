@@ -1,9 +1,10 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { toast } from "react-hot-toast";
-import type { Team } from "@/lib/types"; // We will add this type next
+import { useRouter } from "next/navigation"; // 1. Import the router
+import type { Team } from "@/lib/types";
 
 type TeamSettingsTabProps = {
   team: Team;
@@ -11,9 +12,11 @@ type TeamSettingsTabProps = {
 
 export default function TeamSettingsTab({ team }: TeamSettingsTabProps) {
   const supabase = createClient();
+  const router = useRouter(); // 2. Initialize the router
   const [teamName, setTeamName] = useState(team.name);
   const [logoUrl, setLogoUrl] = useState(team.logo_url);
   const [uploading, setUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogoUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -30,16 +33,18 @@ export default function TeamSettingsTab({ team }: TeamSettingsTabProps) {
 
       const { error: uploadError } = await supabase.storage
         .from("team-logos")
-        .upload(filePath, file, { upsert: true }); // upsert:true overwrites existing file
+        .upload(filePath, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // Get the public URL of the uploaded file to display and save
       const {
         data: { publicUrl },
       } = supabase.storage.from("team-logos").getPublicUrl(filePath);
-      setLogoUrl(publicUrl);
-      toast.success("Logo uploaded!");
+
+      // We need to add a timestamp to the URL to bust the cache
+      const urlWithCacheBuster = `${publicUrl}?t=${new Date().getTime()}`;
+      setLogoUrl(urlWithCacheBuster);
+      toast.success('Logo uploaded! Click "Save Settings" to apply.');
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "An unknown error occurred.";
@@ -51,6 +56,8 @@ export default function TeamSettingsTab({ team }: TeamSettingsTabProps) {
 
   const handleSaveChanges = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
+
     const { error } = await supabase
       .from("teams")
       .update({ name: teamName, logo_url: logoUrl })
@@ -60,7 +67,10 @@ export default function TeamSettingsTab({ team }: TeamSettingsTabProps) {
       toast.error("Failed to save settings.");
     } else {
       toast.success("Settings saved successfully!");
+      // 3. Refresh the entire page data to update the header
+      router.refresh();
     }
+    setIsSubmitting(false);
   };
 
   return (
@@ -120,9 +130,10 @@ export default function TeamSettingsTab({ team }: TeamSettingsTabProps) {
       <div className="flex justify-end pt-4">
         <button
           type="submit"
-          className="py-2 px-6 border rounded-md text-white bg-blue-600 hover:bg-blue-700"
+          disabled={isSubmitting || uploading}
+          className="py-2 px-6 border rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
         >
-          Save Settings
+          {isSubmitting ? "Saving..." : "Save Settings"}
         </button>
       </div>
     </form>

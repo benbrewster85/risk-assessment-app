@@ -8,15 +8,17 @@ import ConfirmModal from "./ConfirmModal";
 import { ProjectListItem } from "@/lib/types";
 import { toast } from "react-hot-toast";
 
-type DashboardClientPageProps = {
+// CORRECTED: The type name now matches the component
+type ProjectListPageProps = {
   initialProjects: ProjectListItem[];
   currentUserRole: string;
 };
 
-export default function DashboardClientPage({
+// CORRECTED: The component now uses the correct props type
+export default function ProjectListPage({
   initialProjects,
   currentUserRole,
-}: DashboardClientPageProps) {
+}: ProjectListPageProps) {
   const supabase = createClient();
   const [projects, setProjects] = useState(initialProjects);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,12 +37,10 @@ export default function DashboardClientPage({
 
   const isEditing = editingProject !== null;
 
-  // This effect pre-fills the form when editing
   useEffect(() => {
     if (isEditing && editingProject) {
       setProjectName(editingProject.name);
       setProjectReference(editingProject.reference || "");
-      // For simplicity, location fields are only for creation
       setProjectAddress("");
       setNewProjectW3W("");
     }
@@ -66,7 +66,6 @@ export default function DashboardClientPage({
       toast.error("Project name is required.");
       return;
     }
-
     const projectData = isEditing
       ? {
           name: projectName,
@@ -78,7 +77,6 @@ export default function DashboardClientPage({
           location_address: projectAddress || null,
           location_what3words: projectW3W || null,
         };
-
     const { data: updatedProject, error } = isEditing
       ? await supabase
           .from("projects")
@@ -215,7 +213,6 @@ export default function DashboardClientPage({
           </div>
         </form>
       </Modal>
-
       <ConfirmModal
         isOpen={deletingProjectId !== null}
         onClose={() => setDeletingProjectId(null)}
@@ -229,7 +226,7 @@ export default function DashboardClientPage({
       <div className="p-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold">Projects</h1>
+            <h1 className="text-3xl font-bold">All Projects</h1>
             {currentUserRole === "team_admin" && (
               <button
                 onClick={openCreateModal}

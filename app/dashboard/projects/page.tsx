@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import DashboardClientPage from "@/components/ProjectListPage";
+import ProjectListPage from "@/components/ProjectListPage"; // Import the renamed component
 import { ProjectListItem } from "@/lib/types";
 
-export default async function Dashboard() {
+export default async function ProjectsPage() {
   const supabase = createClient();
 
   const {
@@ -13,6 +13,7 @@ export default async function Dashboard() {
     redirect("/login");
   }
 
+  // Fetch the projects list and the user's role
   const [projectsResult, profileResult] = await Promise.all([
     supabase
       .from("projects")
@@ -27,15 +28,13 @@ export default async function Dashboard() {
   if (projectsResult.error) {
     console.error("Error fetching projects on server:", projectsResult.error);
     return (
-      <DashboardClientPage
-        initialProjects={[]}
-        currentUserRole={currentUserRole}
-      />
+      <ProjectListPage initialProjects={[]} currentUserRole={currentUserRole} />
     );
   }
 
+  // Render the client component with the pre-fetched data
   return (
-    <DashboardClientPage
+    <ProjectListPage
       initialProjects={projects as ProjectListItem[]}
       currentUserRole={currentUserRole}
     />

@@ -13,14 +13,17 @@
     "@supabase/auth-ui-shared": "^0.1.8",
     "@supabase/ssr": "^0.6.1",
     "next": "14.2.30",
+    "papaparse": "^5.5.3",
     "react": "^18",
     "react-dom": "^18",
+    "react-feather": "^2.0.10",
     "react-hot-toast": "^2.5.2",
     "resend": "^4.6.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/papaparse": "^5.3.16",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/uuid": "^10.0.0",
