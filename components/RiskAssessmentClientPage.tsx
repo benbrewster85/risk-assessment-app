@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState, useCallback, useEffect } from "react";
 import AddRaEntryModal from "@/components/AddRaEntryModal";
 import SignatoryManager from "./SignatoryManager";
+import ConfirmModal from "./ConfirmModal";
 import {
   RiskAssessment,
   RaEntry,
@@ -14,7 +15,6 @@ import {
 } from "@/lib/types";
 import { convertToCsv } from "@/lib/export";
 import { toast } from "react-hot-toast";
-import ConfirmModal from "./ConfirmModal";
 
 const getRiskColor = (score: number) => {
   if (score >= 15) return "bg-red-200";
@@ -43,7 +43,7 @@ export default function RiskAssessmentClientPage({
   currentUserRole,
 }: RiskAssessmentClientPageProps) {
   const supabase = createClient();
-  const [ra, setRa] = useState(initialRa);
+  const [ra] = useState(initialRa);
   const [entries, setEntries] = useState(initialEntries);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<RaEntry | null>(null);
@@ -186,7 +186,7 @@ export default function RiskAssessmentClientPage({
               </p>
             </div>
             <div className="flex space-x-2 flex-shrink-0">
-              {/* THIS IS THE NEW BUTTON */}
+              {/* THIS BUTTON/LINK IS NOW RESTORED */}
               <Link
                 href={`/dashboard/ra/${ra.id}/report`}
                 className="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700"

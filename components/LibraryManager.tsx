@@ -31,12 +31,11 @@ export default function LibraryManager({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<LibraryItem | null>(null);
   const [itemName, setItemName] = useState("");
-  const [deletingItem, setDeletingItem] = useState<LibraryItem | null>(null);
+  const [archivingItem, setArchivingItem] = useState<LibraryItem | null>(null); // Renamed for clarity
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEditing = editingItem !== null;
 
-  // This effect ensures the list updates if the parent component's data changes
   useEffect(() => {
     setItems(initialItems);
   }, [initialItems]);
@@ -54,7 +53,6 @@ export default function LibraryManager({
       return;
     }
     setIsSubmitting(true);
-
     let result;
     if (isEditing) {
       result = await supabase
@@ -70,9 +68,7 @@ export default function LibraryManager({
         .select()
         .single();
     }
-
     const { data, error } = result;
-
     if (error) {
       toast.error(`Failed to save ${itemType.toLowerCase()}: ${error.message}`);
     } else if (data) {
@@ -89,32 +85,38 @@ export default function LibraryManager({
     setIsSubmitting(false);
   };
 
-  const handleDelete = async () => {
-    if (!deletingItem) return;
+  // UPDATED: This function now Archives instead of Deleting
+  const handleArchive = async () => {
+    if (!archivingItem) return;
+
+    // Instead of .delete(), we now use .update() to set the is_archived flag
     const { error } = await supabase
       .from(tableName)
-      .delete()
-      .eq("id", deletingItem.id);
+      .update({ is_archived: true })
+      .eq("id", archivingItem.id);
+
     if (error) {
       toast.error(
-        `Failed to delete ${itemType.toLowerCase()}: ${error.message}`
+        `Failed to archive ${itemType.toLowerCase()}: ${error.message}`
       );
     } else {
-      toast.success(`${itemType} deleted.`);
-      setItems(items.filter((item) => item.id !== deletingItem.id));
+      toast.success(`${itemType} archived successfully.`);
+      // The UI updates by filtering the item out of the active list
+      setItems(items.filter((item) => item.id !== archivingItem.id));
     }
-    setDeletingItem(null);
+    setArchivingItem(null);
   };
 
   return (
     <div className="bg-white p-6 rounded-lg shadow">
+      {/* UPDATED: The confirmation modal now uses archiving language */}
       <ConfirmModal
-        isOpen={deletingItem !== null}
-        onClose={() => setDeletingItem(null)}
-        onConfirm={handleDelete}
-        title={`Delete ${itemType}`}
-        message={`Are you sure you want to delete "${deletingItem?.name}"? This will not affect existing risk assessments, but it will be removed as an option for future entries.`}
-        confirmText="Delete"
+        isOpen={archivingItem !== null}
+        onClose={() => setArchivingItem(null)}
+        onConfirm={handleArchive}
+        title={`Archive ${itemType}`}
+        message={`Are you sure you want to archive "${archivingItem?.name}"? It will be hidden from dropdown lists but will remain in old risk assessments for historical accuracy.`}
+        confirmText="Archive"
         isDestructive={true}
       />
       <Modal
@@ -181,18 +183,19 @@ export default function LibraryManager({
               >
                 Edit
               </button>
+              {/* UPDATED: This button is now for archiving */}
               <button
-                onClick={() => setDeletingItem(item)}
+                onClick={() => setArchivingItem(item)}
                 className="text-sm font-medium text-red-600 hover:text-red-800"
               >
-                Delete
+                Archive
               </button>
             </div>
           </li>
         ))}
         {items.length === 0 && (
           <li className="py-3 text-center text-gray-500">
-            No {itemTypePlural.toLowerCase()} in your library yet.
+            No active {itemTypePlural.toLowerCase()} in your library yet.
           </li>
         )}
       </ul>

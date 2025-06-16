@@ -66,6 +66,7 @@ export default function AddRaEntryModal({
         const { data } = await supabase
           .from("hazards")
           .select("id, name")
+          .eq("is_archived", false)
           .order("name");
         if (data) setHazards(data);
       };
@@ -100,8 +101,10 @@ export default function AddRaEntryModal({
       const { data, error } = await supabase
         .from("risks")
         .select("id, name, hazard_risks!inner(hazard_id)")
+        .eq("is_archived", false)
         .eq("hazard_risks.hazard_id", selectedHazardId)
         .order("name");
+
       if (error) {
         console.error("Error fetching risks", error);
         setRisks([]);

@@ -1,10 +1,11 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { TeamMember } from "@/lib/types";
+import { TeamMember, Team } from "@/lib/types";
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import LibraryPage from "@/components/LibraryPage";
+import TeamSettingsTab from "@/components/TeamSettingsTab";
 
 export default function TeamPage() {
   const supabase = createClient();
@@ -12,15 +13,13 @@ export default function TeamPage() {
   const [activeTab, setActiveTab] = useState("members");
 
   // State for all data on this page
+  const [team, setTeam] = useState<Team | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [hazards, setHazards] = useState<{ id: string; name: string }[]>([]);
   const [risks, setRisks] = useState<{ id: string; name: string }[]>([]);
 
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
-  const [currentUserTeamId, setCurrentUserTeamId] = useState<string | null>(
-    null
-  );
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null); // State for current user's ID
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Invite form state
   const [inviteEmail, setInviteEmail] = useState("");
@@ -34,7 +33,7 @@ export default function TeamPage() {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        setCurrentUserId(user.id); // Set the user's ID
+        setCurrentUserId(user.id);
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
           .select("role, team_id")
@@ -48,30 +47,33 @@ export default function TeamPage() {
 
         if (profileData) {
           setCurrentUserRole(profileData.role);
-          setCurrentUserTeamId(profileData.team_id);
+          const teamId = profileData.team_id;
 
-          const [membersResult, hazardsResult, risksResult] = await Promise.all(
-            [
+          const [membersResult, hazardsResult, risksResult, teamResult] =
+            await Promise.all([
               supabase
                 .from("profiles")
                 .select("id, first_name, last_name, role")
-                .eq("team_id", profileData.team_id),
+                .eq("team_id", teamId),
               supabase
                 .from("hazards")
                 .select("id, name")
-                .eq("team_id", profileData.team_id)
+                .eq("team_id", teamId)
+                .eq("is_archived", false)
                 .order("name"),
               supabase
                 .from("risks")
                 .select("id, name")
-                .eq("team_id", profileData.team_id)
+                .eq("team_id", teamId)
+                .eq("is_archived", false)
                 .order("name"),
-            ]
-          );
+              supabase.from("teams").select("*").eq("id", teamId).single(),
+            ]);
 
           if (membersResult.data) setTeamMembers(membersResult.data);
           if (hazardsResult.data) setHazards(hazardsResult.data);
           if (risksResult.data) setRisks(risksResult.data);
+          if (teamResult.data) setTeam(teamResult.data);
         }
       }
       setLoading(false);
@@ -81,7 +83,7 @@ export default function TeamPage() {
 
   const handleInviteUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteEmail || !currentUserTeamId) {
+    if (!inviteEmail || !team?.id) {
       toast.error("Could not determine your team. Please refresh the page.");
       return;
     }
@@ -89,12 +91,7 @@ export default function TeamPage() {
     const response = await fetch("/api/send-invite", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // CORRECTED: Use the correct variable name 'inviteEmail'
-      body: JSON.stringify({
-        inviteeEmail: inviteEmail,
-        role: inviteRole,
-        teamId: currentUserTeamId,
-      }),
+      body: JSON.stringify({ inviteEmail, role: inviteRole, teamId: team.id }),
     });
     const result = await response.json();
     if (!response.ok) {
@@ -135,6 +132,7 @@ export default function TeamPage() {
     <div className="p-8">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-4">Team & Library Management</h1>
+
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8" aria-label="Tabs">
             <button
@@ -157,6 +155,7 @@ export default function TeamPage() {
             </button>
           </nav>
         </div>
+
         <div className="mt-8">
           {!isAdmin ? (
             <p className="text-red-600">
@@ -255,13 +254,11 @@ export default function TeamPage() {
                 <LibraryPage
                   hazards={hazards}
                   risks={risks}
-                  teamId={currentUserTeamId}
+                  teamId={team?.id || null}
                 />
               )}
-              {activeTab === "settings" && (
-                <div className="text-center text-gray-500 p-8 bg-white rounded-lg shadow">
-                  Team Settings - Coming Soon
-                </div>
+              {activeTab === "settings" && team && (
+                <TeamSettingsTab team={team} />
               )}
             </>
           )}

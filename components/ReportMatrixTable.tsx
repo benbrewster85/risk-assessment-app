@@ -4,7 +4,6 @@ type ReportMatrixTableProps = {
   entries: RaEntry[];
 };
 
-// This helper function will be used inside the component
 const getRiskColor = (score: number) => {
   if (score >= 15) return "bg-red-500 text-white";
   if (score >= 9) return "bg-orange-500 text-white";
@@ -14,18 +13,22 @@ const getRiskColor = (score: number) => {
 
 export default function ReportMatrixTable({ entries }: ReportMatrixTableProps) {
   return (
-    <section className="mt-8">
+    <section className="mt-8 break-after-page">
       <h3 className="text-xl font-bold border-b border-gray-400 pb-2 mb-4">
         Risk Assessment Matrix
       </h3>
       <div className="overflow-x-auto">
-        <table className="min-w-full border border-gray-300 text-sm">
+        <table className="min-w-full border-collapse border border-gray-300 text-sm">
           <thead className="bg-gray-100 print:bg-gray-100">
             <tr>
-              <th className="border p-2 font-semibold">Activity / Task</th>
-              <th className="border p-2 font-semibold">Hazard</th>
-              <th className="border p-2 font-semibold">Risk</th>
-              <th className="border p-2 font-semibold">Who is Affected?</th>
+              <th className="border p-2 font-semibold text-left">
+                Activity / Task
+              </th>
+              <th className="border p-2 font-semibold text-left">Hazard</th>
+              <th className="border p-2 font-semibold text-left">Risk</th>
+              <th className="border p-2 font-semibold text-left">
+                Who is Affected?
+              </th>
               <th
                 className="border p-1 font-semibold"
                 title="Initial Likelihood"
@@ -38,7 +41,9 @@ export default function ReportMatrixTable({ entries }: ReportMatrixTableProps) {
               <th className="border p-1 font-semibold" title="Initial Risk">
                 IR
               </th>
-              <th className="border p-2 font-semibold">Control Measures</th>
+              <th className="border p-2 font-semibold text-left">
+                Control Measures
+              </th>
               <th
                 className="border p-1 font-semibold"
                 title="Resultant Likelihood"
@@ -62,30 +67,38 @@ export default function ReportMatrixTable({ entries }: ReportMatrixTableProps) {
                   entry.resultant_likelihood * entry.resultant_impact;
                 return (
                   <tr key={entry.id} className="break-inside-avoid">
-                    <td className="border p-2">{entry.task_description}</td>
-                    <td className="border p-2">{entry.hazard?.name}</td>
-                    <td className="border p-2">{entry.risk?.name}</td>
-                    <td className="border p-2">{entry.person_affected}</td>
-                    <td className="border p-1 text-center">
+                    <td className="border p-2 align-top">
+                      {entry.task_description}
+                    </td>
+                    <td className="border p-2 align-top">
+                      {entry.hazard?.name}
+                    </td>
+                    <td className="border p-2 align-top">{entry.risk?.name}</td>
+                    <td className="border p-2 align-top">
+                      {entry.person_affected}
+                    </td>
+                    <td className="border p-1 text-center align-top">
                       {entry.initial_likelihood}
                     </td>
-                    <td className="border p-1 text-center">
+                    <td className="border p-1 text-center align-top">
                       {entry.initial_impact}
                     </td>
                     <td
-                      className={`border p-1 text-center font-bold ${getRiskColor(initialRisk)}`}
+                      className={`border p-1 text-center font-bold align-top ${getRiskColor(initialRisk)}`}
                     >
                       {initialRisk}
                     </td>
-                    <td className="border p-2">{entry.control_measures}</td>
-                    <td className="border p-1 text-center">
+                    <td className="border p-2 align-top">
+                      {entry.control_measures}
+                    </td>
+                    <td className="border p-1 text-center align-top">
                       {entry.resultant_likelihood}
                     </td>
-                    <td className="border p-1 text-center">
+                    <td className="border p-1 text-center align-top">
                       {entry.resultant_impact}
                     </td>
                     <td
-                      className={`border p-1 text-center font-bold ${getRiskColor(resultantRisk)}`}
+                      className={`border p-1 text-center font-bold align-top ${getRiskColor(resultantRisk)}`}
                     >
                       {resultantRisk}
                     </td>

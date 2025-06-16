@@ -88,3 +88,28 @@ export type DynamicRisk = {
         last_name: string | null;
     } | null;
 };
+
+export type Team = {
+  id: string;
+  name: string;
+  logo_url: string | null;
+};
+
+
+export type ReportSignatory = {
+    profiles: {
+        first_name: string | null;
+        last_name: string | null;
+        role: string;
+        id: string; // The user's ID
+    } | null;
+};
+
+export type ReportSignature = {
+    signed_at: string;
+    profiles: {
+        first_name: string | null;
+        last_name: string | null;
+        id: string; // The user's ID
+    } | null;
+};
