@@ -1,12 +1,9 @@
 "use client";
 
-import { Auth } from "@supabase/auth-ui-react";
-import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
-// CORRECTED: These types now come from the main supabase-js package
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 export default function LoginForm() {
@@ -15,9 +12,9 @@ export default function LoginForm() {
   const searchParams = useSearchParams();
 
   const initialView =
-    searchParams.get("view") === "sign_up" ? "sign_up" : "sign_in";
+    searchParams.get("view") === "sign_up" ? "sign_up" : "enter_email";
   const [view, setView] = useState<"sign_in" | "sign_up" | "enter_email">(
-    "enter_email"
+    initialView
   );
 
   const [isLoading, setIsLoading] = useState(false);
@@ -53,15 +50,12 @@ export default function LoginForm() {
     if (!response.ok) {
       toast.error(result.error || "An unknown error occurred.");
     } else {
-      if (result.status === "USER_EXISTS") {
-        setView("sign_in");
-      } else if (result.status === "INVITE_PENDING") {
-        setView("sign_up");
-      } else {
+      if (result.status === "USER_EXISTS") setView("sign_in");
+      else if (result.status === "INVITE_PENDING") setView("sign_up");
+      else
         toast.error(
           "No account or invitation found for this email. Please contact your administrator."
         );
-      }
     }
     setIsLoading(false);
   };
