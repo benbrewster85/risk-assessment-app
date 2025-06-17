@@ -131,7 +131,7 @@ export type ReportSignatory = {
   // Add any other fields your app expects
 };
 
-export type ReportSignatore = {
+export type ReportSignature = {
   id: string;
   name: string;
   signed_at: string | null;
