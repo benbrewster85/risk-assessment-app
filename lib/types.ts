@@ -123,3 +123,10 @@ export type Asset = {
         } | null;
     } | null;
 };
+
+export type ReportSignatory = {
+  id: string;
+  name: string;
+  signed_at: string | null;
+  // Add any other fields your app expects
+};
