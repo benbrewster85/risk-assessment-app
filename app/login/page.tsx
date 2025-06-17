@@ -12,7 +12,7 @@ function Loading() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<Loading />}>
+    <Suspense fallback={<div>Loading...</div>}>
       <LoginForm />
     </Suspense>
   );
