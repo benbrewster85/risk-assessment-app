@@ -95,7 +95,6 @@ export type AssetCategory = {
     } | null;
 };
 
-// UPDATED: This type now includes the parent_asset_id
 export type Asset = {
     id: string;
     system_id: string;
@@ -110,10 +109,8 @@ export type Asset = {
     parent_asset_id: string | null;
     last_calibrated_date: string | null;
     calibration_cycle_months: number | null;
-    // Joined data
     category: { name: string } | null;
     assignee: { first_name: string | null, last_name: string | null } | null;
-    // UPDATED: parent can now hold more details
     parent: {
         id: string;
         system_id: string;
@@ -124,16 +121,21 @@ export type Asset = {
     } | null;
 };
 
+// These are the missing types for the report
 export type ReportSignatory = {
-  id: string;
-  name: string;
-  signed_at: string | null;
-  // Add any other fields your app expects
+    profiles: {
+        first_name: string | null;
+        last_name: string | null;
+        role: string;
+        id: string;
+    } | null;
 };
 
 export type ReportSignature = {
-  id: string;
-  name: string;
-  signed_at: string | null;
-  // Add any other fields your app expects
+    signed_at: string;
+    profiles: {
+        first_name: string | null;
+        last_name: string | null;
+        id: string;
+    } | null;
 };
