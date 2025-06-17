@@ -1,4 +1,4 @@
-import { RaEntry } from './types';
+import { RaEntry, Asset } from './types';
 
 function escapeCsvCell(cellData: string | number | boolean | null | undefined): string {
     const stringData = String(cellData === null || cellData === undefined ? '' : cellData);
@@ -9,8 +9,9 @@ function escapeCsvCell(cellData: string | number | boolean | null | undefined): 
     return stringData;
 }
 
+// Existing function for Risk Assessments (no changes)
 export function convertToCsv(data: RaEntry[]): string {
-    const headers = ["Activity / Task", "Hazard", "Risk", "Who is Affected?", "Initial Likelihood", "Initial Impact", "Initial Risk", "Control Measures", "Resultant Likelihood", "Resultant Impact", "Resultant Risk"];
+    const headers = [ "Activity / Task", "Hazard", "Risk", "Who is Affected?", "Initial Likelihood", "Initial Impact", "Initial Risk", "Control Measures", "Resultant Likelihood", "Resultant Impact", "Resultant Risk" ];
     const rows = data.map(entry => {
         const initialRisk = entry.initial_likelihood * entry.initial_impact;
         const resultantRisk = entry.resultant_likelihood * entry.resultant_impact;
@@ -21,5 +22,31 @@ export function convertToCsv(data: RaEntry[]): string {
         ];
         return rowData.join(',');
     });
+    return [headers.join(','), ...rows].join('\n');
+}
+
+// NEW: Dedicated function for exporting assets
+export function exportAssetsToCsv(data: Asset[]): string {
+    const headers = [
+        "System ID", "Category", "Manufacturer", "Model", "Serial Number",
+        "Status", "Assigned To", "Last Calibrated", "Calibration Cycle (Months)"
+    ];
+    
+    const rows = data.map(asset => {
+        const assigneeName = `${asset.assignee?.first_name || ''} ${asset.assignee?.last_name || ''}`.trim() || 'In Stores';
+        const rowData = [
+            escapeCsvCell(asset.system_id),
+            escapeCsvCell(asset.category?.name),
+            escapeCsvCell(asset.manufacturer),
+            escapeCsvCell(asset.model),
+            escapeCsvCell(asset.serial_number),
+            escapeCsvCell(asset.status),
+            escapeCsvCell(assigneeName),
+            escapeCsvCell(asset.last_calibrated_date),
+            escapeCsvCell(asset.calibration_cycle_months),
+        ];
+        return rowData.join(',');
+    });
+
     return [headers.join(','), ...rows].join('\n');
 }

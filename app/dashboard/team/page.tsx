@@ -12,7 +12,6 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("members");
 
-  // State for all data on this page
   const [team, setTeam] = useState<Team | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [hazards, setHazards] = useState<{ id: string; name: string }[]>([]);
@@ -22,7 +21,6 @@ export default function TeamPage() {
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Invite form state
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("user");
   const [isInviting, setIsInviting] = useState(false);
@@ -129,15 +127,11 @@ export default function TeamPage() {
   const handleRoleChange = async (userId: string, newRole: string) => {
     if (userId === currentUserId) {
       toast.error("You cannot change your own role.");
-      // Revert the dropdown visually
-      const originalRole = teamMembers.find((m) => m.id === userId)?.role;
-      if (originalRole) {
-        setTeamMembers((currentMembers) =>
-          currentMembers.map((m) =>
-            m.id === userId ? { ...m, role: originalRole } : m
-          )
-        );
-      }
+      // This is a small UX improvement to revert the dropdown if the user tries to change their own role.
+      const selectElement = document.querySelector(
+        `[data-user-id="${userId}"]`
+      ) as HTMLSelectElement;
+      if (selectElement) selectElement.value = currentUserRole || "user";
       return;
     }
     const { error } = await supabase
@@ -162,7 +156,8 @@ export default function TeamPage() {
 
   return (
     <div className="p-8">
-      <div className="max-w-4xl mx-auto">
+      {/* UPDATED: This class now matches the other pages */}
+      <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold mb-4">Team & Library Management</h1>
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8" aria-label="Tabs">
@@ -264,6 +259,7 @@ export default function TeamPage() {
                             </p>
                           </div>
                           <select
+                            data-user-id={member.id}
                             value={member.role}
                             onChange={(e) =>
                               handleRoleChange(member.id, e.target.value)

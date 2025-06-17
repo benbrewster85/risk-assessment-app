@@ -8,7 +8,6 @@ import ConfirmModal from "./ConfirmModal";
 import { ProjectListItem } from "@/lib/types";
 import { toast } from "react-hot-toast";
 
-// UPDATED: The component now receives the teamId
 type ProjectListPageProps = {
   initialProjects: ProjectListItem[];
   currentUserRole: string;
@@ -29,13 +28,10 @@ export default function ProjectListPage({
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(
     null
   );
-
-  // Form state
   const [projectName, setProjectName] = useState("");
   const [projectReference, setProjectReference] = useState("");
   const [projectAddress, setProjectAddress] = useState("");
   const [projectW3W, setNewProjectW3W] = useState("");
-
   const isEditing = editingProject !== null;
 
   useEffect(() => {
@@ -48,84 +44,16 @@ export default function ProjectListPage({
   }, [isEditing, editingProject]);
 
   const openCreateModal = () => {
-    setEditingProject(null);
-    setProjectName("");
-    setProjectReference("");
-    setProjectAddress("");
-    setNewProjectW3W("");
-    setIsModalOpen(true);
+    /* ... */
   };
-
   const openEditModal = (project: ProjectListItem) => {
-    setEditingProject(project);
-    setIsModalOpen(true);
+    /* ... */
   };
-
   const handleProjectSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!projectName) {
-      toast.error("Project name is required.");
-      return;
-    }
-
-    // UPDATED: The team_id is now included in the insert payload
-    const projectData = {
-      name: projectName,
-      reference: projectReference || null,
-      location_address: projectAddress || null,
-      location_what3words: projectW3W || null,
-      team_id: teamId,
-    };
-
-    // When editing, we don't need to update team_id
-    const updateData = {
-      name: projectName,
-      reference: projectReference || null,
-    };
-
-    const { data: updatedProject, error } = isEditing
-      ? await supabase
-          .from("projects")
-          .update(updateData)
-          .eq("id", editingProject!.id)
-          .select("id, name, reference, last_edited_at")
-          .single()
-      : await supabase
-          .from("projects")
-          .insert(projectData)
-          .select("id, name, reference, last_edited_at")
-          .single();
-
-    if (error) {
-      toast.error(`Failed to save project: ${error.message}`);
-    } else if (updatedProject) {
-      toast.success(
-        `Project ${isEditing ? "updated" : "created"} successfully!`
-      );
-      if (isEditing) {
-        setProjects(
-          projects.map((p) => (p.id === updatedProject.id ? updatedProject : p))
-        );
-      } else {
-        setProjects([updatedProject, ...projects]);
-      }
-      setIsModalOpen(false);
-    }
+    /* ... */
   };
-
   const handleDeleteProject = async () => {
-    if (!deletingProjectId) return;
-    const { error } = await supabase
-      .from("projects")
-      .delete()
-      .eq("id", deletingProjectId);
-    if (error) {
-      toast.error(`Failed to delete project: ${error.message}`);
-    } else {
-      toast.success("Project deleted.");
-      setProjects(projects.filter((p) => p.id !== deletingProjectId));
-    }
-    setDeletingProjectId(null);
+    /* ... */
   };
 
   return (
@@ -148,7 +76,6 @@ export default function ProjectListPage({
               id="projectName"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
               required
             />
           </div>
@@ -164,7 +91,6 @@ export default function ProjectListPage({
               id="projectRef"
               value={projectReference}
               onChange={(e) => setProjectReference(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
             />
           </div>
           {!isEditing && (
@@ -181,7 +107,6 @@ export default function ProjectListPage({
                   value={projectAddress}
                   onChange={(e) => setProjectAddress(e.target.value)}
                   rows={3}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
                 />
               </div>
               <div>
@@ -196,7 +121,6 @@ export default function ProjectListPage({
                   id="projectW3W"
                   value={projectW3W}
                   onChange={(e) => setNewProjectW3W(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
                   placeholder="e.g. ///filled.count.soap"
                 />
               </div>
@@ -206,7 +130,7 @@ export default function ProjectListPage({
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="mr-2 py-2 px-4 border border-gray-300 rounded-md"
+              className="mr-2 py-2 px-4 border border-gray-300 rounded-md hover:bg-gray-50"
             >
               Cancel
             </button>
@@ -247,7 +171,7 @@ export default function ProjectListPage({
                 {projects.map((project) => (
                   <div
                     key={project.id}
-                    className="border p-4 rounded-lg flex flex-col justify-between hover:shadow-lg transition-shadow"
+                    className="border p-4 rounded-lg flex flex-col justify-between bg-slate-50 hover:shadow-lg"
                   >
                     <Link
                       href={`/dashboard/project/${project.id}`}

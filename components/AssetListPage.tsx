@@ -10,7 +10,7 @@ import ConfirmModal from "./ConfirmModal";
 import Modal from "./Modal";
 import { Asset, TeamMember } from "@/lib/types";
 import StatusBadge from "./StatusBadge";
-import { AlertTriangle, CheckCircle } from "react-feather";
+import { AlertTriangle, CheckCircle, Download } from "react-feather";
 import Papa from "papaparse";
 
 type Category = { id: string; name: string };
@@ -63,10 +63,12 @@ export default function AssetListPage({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
 
+  // State for filters
   const [categoryFilter, setCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
 
+  // State for selections and bulk actions
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(
     new Set()
   );
@@ -74,16 +76,7 @@ export default function AssetListPage({
   const [bulkAssignCategoryId, setBulkAssignCategoryId] = useState("");
 
   const handleSuccess = (resultAsset: Asset) => {
-    if (editingAsset) {
-      setAssets(
-        assets.map((asset) =>
-          asset.id === resultAsset.id ? resultAsset : asset
-        )
-      );
-    } else {
-      setAssets((currentAssets) => [resultAsset, ...currentAssets]);
-    }
-    setEditingAsset(null);
+    router.refresh();
   };
 
   const openCreateModal = () => {
@@ -106,7 +99,7 @@ export default function AssetListPage({
       toast.error(`Failed to delete asset: ${error.message}`);
     } else {
       toast.success("Asset deleted.");
-      setAssets(assets.filter((asset) => asset.id !== deletingAsset.id));
+      setAssets(assets.filter((asset) => asset.id !== deletingAsset!.id));
     }
     setDeletingAsset(null);
   };
@@ -308,12 +301,21 @@ export default function AssetListPage({
           </div>
         </form>
       </Modal>
+
       <div className="p-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-bold">Asset Management</h1>
             {isCurrentUserAdmin && (
               <div className="flex space-x-2">
+                <a
+                  href="/api/assets/export"
+                  download
+                  className="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700 flex items-center"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Inventory
+                </a>
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -337,6 +339,7 @@ export default function AssetListPage({
               </div>
             )}
           </div>
+
           {selectedAssetIds.size > 0 && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
               <p className="text-sm font-semibold text-blue-800">
@@ -352,6 +355,7 @@ export default function AssetListPage({
               </div>
             </div>
           )}
+
           <div className="mb-4 p-4 bg-white rounded-lg shadow border">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
               <h3 className="text-lg font-semibold col-span-1 md:col-span-4">
@@ -424,6 +428,7 @@ export default function AssetListPage({
               </div>
             </div>
           </div>
+
           <div className="bg-white rounded-lg shadow overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">

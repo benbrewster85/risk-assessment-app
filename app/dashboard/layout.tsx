@@ -41,7 +41,7 @@ export default async function DashboardLayout({
       <Header team={team} isSuperAdmin={isSuperAdmin} />
       <div className="flex-1 flex overflow-hidden">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto bg-slate-50">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-slate-100">{children}</main>
       </div>
     </div>
   );
