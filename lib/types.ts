@@ -130,3 +130,10 @@ export type ReportSignatory = {
   signed_at: string | null;
   // Add any other fields your app expects
 };
+
+export type ReportSignatore = {
+  id: string;
+  name: string;
+  signed_at: string | null;
+  // Add any other fields your app expects
+};
