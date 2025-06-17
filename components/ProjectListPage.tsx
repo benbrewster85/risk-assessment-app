@@ -8,16 +8,17 @@ import ConfirmModal from "./ConfirmModal";
 import { ProjectListItem } from "@/lib/types";
 import { toast } from "react-hot-toast";
 
-// CORRECTED: The type name now matches the component
+// UPDATED: The component now receives the teamId
 type ProjectListPageProps = {
   initialProjects: ProjectListItem[];
   currentUserRole: string;
+  teamId: string | null;
 };
 
-// CORRECTED: The component now uses the correct props type
 export default function ProjectListPage({
   initialProjects,
   currentUserRole,
+  teamId,
 }: ProjectListPageProps) {
   const supabase = createClient();
   const [projects, setProjects] = useState(initialProjects);
@@ -66,21 +67,26 @@ export default function ProjectListPage({
       toast.error("Project name is required.");
       return;
     }
-    const projectData = isEditing
-      ? {
-          name: projectName,
-          reference: projectReference || null,
-        }
-      : {
-          name: projectName,
-          reference: projectReference || null,
-          location_address: projectAddress || null,
-          location_what3words: projectW3W || null,
-        };
+
+    // UPDATED: The team_id is now included in the insert payload
+    const projectData = {
+      name: projectName,
+      reference: projectReference || null,
+      location_address: projectAddress || null,
+      location_what3words: projectW3W || null,
+      team_id: teamId,
+    };
+
+    // When editing, we don't need to update team_id
+    const updateData = {
+      name: projectName,
+      reference: projectReference || null,
+    };
+
     const { data: updatedProject, error } = isEditing
       ? await supabase
           .from("projects")
-          .update(projectData)
+          .update(updateData)
           .eq("id", editingProject!.id)
           .select("id, name, reference, last_edited_at")
           .single()
@@ -218,11 +224,10 @@ export default function ProjectListPage({
         onClose={() => setDeletingProjectId(null)}
         onConfirm={handleDeleteProject}
         title="Delete Project"
-        message={`Are you sure you want to delete this project? All of its data, including risk assessments, will be permanently removed. This action cannot be undone.`}
+        message={`Are you sure you want to delete this project? All of its data will be permanently removed.`}
         confirmText="Delete Project"
         isDestructive={true}
       />
-
       <div className="p-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-8">
