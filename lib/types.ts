@@ -121,7 +121,7 @@ export type Asset = {
     } | null;
 };
 
-// These are the missing types for the report
+// These are the types required for the report
 export type ReportSignatory = {
     profiles: {
         first_name: string | null;
