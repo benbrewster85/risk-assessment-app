@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import AssetListPage from "@/components/AssetListPage";
 import { Asset, TeamMember } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 export default async function AssetsPage() {
   const supabase = createClient();
   const {
@@ -21,14 +23,12 @@ export default async function AssetsPage() {
   const teamId = profile?.team_id || null;
   const currentUserRole = profile?.role || "user";
 
+  // UPDATED: Now queries our simple and powerful view
   const [assetsResult, categoriesResult, teamMembersResult] = await Promise.all(
     [
-      // UPDATED: This query is now more powerful to get parent data
       supabase
-        .from("assets")
-        .select(
-          "*, category:asset_categories(name), assignee:profiles(first_name, last_name), parent:assets!parent_asset_id(assignee:profiles(first_name, last_name))"
-        )
+        .from("assets_with_details")
+        .select("*")
         .eq("team_id", teamId)
         .order("created_at", { ascending: false }),
       supabase
@@ -44,21 +44,9 @@ export default async function AssetsPage() {
     ]
   );
 
-  // This transformation handles Supabase's nested data structure
-  const initialAssets = (assetsResult.data || []).map((asset) => ({
-    ...asset,
-    category: Array.isArray(asset.category)
-      ? asset.category[0]
-      : asset.category,
-    assignee: Array.isArray(asset.assignee)
-      ? asset.assignee[0]
-      : asset.assignee,
-    parent: Array.isArray(asset.parent) ? asset.parent[0] : asset.parent,
-  }));
-
   return (
     <AssetListPage
-      initialAssets={initialAssets as Asset[]}
+      initialAssets={(assetsResult.data as Asset[]) || []}
       categories={categoriesResult.data || []}
       teamMembers={(teamMembersResult.data as TeamMember[]) || []}
       teamId={teamId}

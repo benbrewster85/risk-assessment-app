@@ -20,29 +20,24 @@ export async function POST(request: Request) {
             auth: { autoRefreshToken: false, persistSession: false }
         });
 
-        // CORRECTED: Use our RPC helper function to safely look in the 'auth' schema
+        // Use our database function to safely check for an existing user
         const { data: userId, error: rpcError } = await supabaseAdmin
             .rpc('lookup_user_by_email', { p_email: email });
-
-        if (rpcError) {
-            // Don't throw an error if the function simply returns null (user not found)
-            // Only throw if there's an actual database error.
-            console.error("RPC Error:", rpcError);
-            throw new Error("A database error occurred while looking up user.");
-        }
+        
+        if (rpcError) throw rpcError;
 
         if (userId) {
-            // If the function returned a user ID, the user exists.
+            // If the user exists, tell the frontend to show the login/password form
             return NextResponse.json({ status: 'USER_EXISTS' });
         }
 
-        // If no user exists, check for a pending invitation in the public schema
+        // If no user exists, check for a pending invitation
         const { data: inviteData, error: inviteError } = await supabaseAdmin
             .from('invites')
             .select('id')
             .eq('email', email)
             .eq('status', 'pending')
-            .maybeSingle(); // Use maybeSingle to not error if no row is found
+            .maybeSingle();
         
         if (inviteError) throw inviteError;
 

@@ -3,6 +3,9 @@ import { notFound } from "next/navigation";
 import AssetDetailPage from "@/components/AssetDetailPage";
 import { Asset, TeamMember } from "@/lib/types";
 
+// This line tells Next.js to always treat this page as dynamic and fetch fresh data
+export const dynamic = "force-dynamic";
+
 type AssetPageProps = {
   params: { assetId: string };
 };
@@ -26,57 +29,42 @@ export default async function AssetPage({ params }: AssetPageProps) {
   const teamId = profile.team_id;
   const currentUserRole = profile.role;
 
-  // UPDATED: The select query now fetches more parent details
-  const [
-    assetResult,
-    teamMembersResult,
-    childAssetsResult,
-    availableAssetsResult,
-  ] = await Promise.all([
-    supabase
-      .from("assets")
-      .select(
-        "*, category:asset_categories(name), assignee:profiles(first_name, last_name), parent:assets!parent_asset_id(id, system_id)"
-      )
-      .eq("id", assetId)
-      .single(),
-    supabase
-      .from("profiles")
-      .select("id, first_name, last_name")
-      .eq("team_id", teamId),
-    supabase
-      .from("assets")
-      .select("id, system_id, model")
-      .eq("parent_asset_id", assetId),
-    supabase
-      .from("assets")
-      .select("id, system_id, model")
-      .eq("team_id", teamId)
-      .is("parent_asset_id", null)
-      .is("current_assignee_id", null)
-      .neq("id", assetId),
-  ]);
+  // UPDATED: This now queries our 'assets_with_details' view to get all data
+  const { data: assetResult, error: assetError } = await supabase
+    .from("assets_with_details")
+    .select("*")
+    .eq("id", assetId)
+    .eq("team_id", teamId)
+    .single();
 
-  if (assetResult.error || !assetResult.data) {
+  if (assetError || !assetResult) {
+    if (assetError) console.error("Error fetching asset details:", assetError);
     notFound();
   }
 
-  const initialAsset = {
-    ...assetResult.data,
-    category: Array.isArray(assetResult.data.category)
-      ? assetResult.data.category[0]
-      : assetResult.data.category,
-    assignee: Array.isArray(assetResult.data.assignee)
-      ? assetResult.data.assignee[0]
-      : assetResult.data.assignee,
-    parent: Array.isArray(assetResult.data.parent)
-      ? assetResult.data.parent[0]
-      : assetResult.data.parent,
-  };
+  // Fetch other related data needed for the page
+  const [teamMembersResult, childAssetsResult, availableAssetsResult] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, first_name, last_name, role")
+        .eq("team_id", teamId),
+      supabase
+        .from("assets")
+        .select("id, system_id, model")
+        .eq("parent_asset_id", assetId),
+      supabase
+        .from("assets")
+        .select("id, system_id, model")
+        .eq("team_id", teamId)
+        .is("parent_asset_id", null)
+        .is("current_assignee_id", null)
+        .neq("id", assetId),
+    ]);
 
   return (
     <AssetDetailPage
-      initialAsset={initialAsset as Asset}
+      initialAsset={assetResult as Asset}
       teamMembers={(teamMembersResult.data as TeamMember[]) || []}
       childAssets={childAssetsResult.data || []}
       availableAssets={availableAssetsResult.data || []}

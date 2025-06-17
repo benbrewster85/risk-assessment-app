@@ -95,6 +95,7 @@ export type AssetCategory = {
     } | null;
 };
 
+// UPDATED: This type now has a flat structure to match our database view
 export type Asset = {
     id: string;
     system_id: string;
@@ -109,33 +110,10 @@ export type Asset = {
     parent_asset_id: string | null;
     last_calibrated_date: string | null;
     calibration_cycle_months: number | null;
-    category: { name: string } | null;
-    assignee: { first_name: string | null, last_name: string | null } | null;
-    parent: {
-        id: string;
-        system_id: string;
-        assignee: {
-            first_name: string | null;
-            last_name: string | null;
-        } | null;
-    } | null;
-};
-
-// These are the types required for the report
-export type ReportSignatory = {
-    profiles: {
-        first_name: string | null;
-        last_name: string | null;
-        role: string;
-        id: string;
-    } | null;
-};
-
-export type ReportSignature = {
-    signed_at: string;
-    profiles: {
-        first_name: string | null;
-        last_name: string | null;
-        id: string;
-    } | null;
+    // Flat properties from joined tables
+    category_name: string | null;
+    assignee_first_name: string | null;
+    assignee_last_name: string | null;
+    parent_assignee_first_name: string | null;
+    parent_assignee_last_name: string | null;
 };

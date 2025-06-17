@@ -11,14 +11,13 @@ export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Check URL for ?view=sign_up, otherwise default to the start
   const initialView =
     searchParams.get("view") === "sign_up" ? "sign_up" : "enter_email";
-  const [view, setView] = useState<"sign_in" | "sign_up" | "enter_email">(
-    initialView
-  );
-
+  const [view, setView] = useState<
+    "sign_in" | "sign_up" | "enter_email" | "forgot_password"
+  >(initialView);
   const [isLoading, setIsLoading] = useState(false);
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -95,6 +94,21 @@ export default function LoginForm() {
     setIsLoading(false);
   };
 
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/update-password`,
+    });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Password reset link sent! Please check your email.");
+      setView("enter_email");
+    }
+    setIsLoading(false);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
       <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
@@ -130,6 +144,7 @@ export default function LoginForm() {
             </button>
           </form>
         )}
+
         {view === "sign_in" && (
           <form onSubmit={handleSignIn}>
             <h2 className="text-center text-3xl font-extrabold text-gray-900 mb-6">
@@ -171,10 +186,19 @@ export default function LoginForm() {
                 />
               </div>
             </div>
+            <div className="text-sm text-center mt-2">
+              <button
+                type="button"
+                onClick={() => setView("forgot_password")}
+                className="font-medium text-blue-600 hover:text-blue-500"
+              >
+                Forgot your password?
+              </button>
+            </div>
             <button
               type="submit"
               disabled={isLoading}
-              className="mt-6 w-full py-2 px-4 border rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
+              className="mt-4 w-full py-2 px-4 border rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
             >
               {isLoading ? "Signing In..." : "Sign In"}
             </button>
@@ -190,6 +214,44 @@ export default function LoginForm() {
             </button>
           </form>
         )}
+
+        {view === "forgot_password" && (
+          <form onSubmit={handlePasswordReset}>
+            <h2 className="text-center text-3xl font-extrabold text-gray-900 mb-6">
+              Reset Your Password
+            </h2>
+            <div>
+              <label
+                htmlFor="email-reset"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Email Address
+              </label>
+              <input
+                id="email-reset"
+                type="email"
+                value={email}
+                disabled
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-100"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="mt-6 w-full py-2 px-4 border rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
+            >
+              {isLoading ? "Sending..." : "Send Reset Instructions"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("sign_in")}
+              className="mt-2 w-full text-sm text-center text-gray-600 hover:underline"
+            >
+              Back to Sign In
+            </button>
+          </form>
+        )}
+
         {view === "sign_up" && (
           <form onSubmit={handleSignUp} className="space-y-4">
             <h2 className="text-center text-3xl font-extrabold text-gray-900 mb-6">

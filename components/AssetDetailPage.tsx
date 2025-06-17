@@ -39,25 +39,21 @@ export default function AssetDetailPage({
     asset.current_assignee_id || ""
   );
   const [isAssigning, setIsAssigning] = useState(false);
-
   const [selectedChildId, setSelectedChildId] = useState("");
   const [isAssociating, setIsAssociating] = useState(false);
 
   const handleAssign = async () => {
     setIsAssigning(true);
-    const newAssigneeId = selectedAssignee || null;
-
     const { error } = await supabase.rpc("assign_asset_with_children", {
       p_asset_id: asset.id,
-      p_new_assignee_id: newAssigneeId,
+      p_new_assignee_id: selectedAssignee || null,
       p_team_id: asset.team_id,
     });
-
     if (error) {
       toast.error(`Failed to assign asset: ${error.message}`);
     } else {
-      toast.success("Asset and its accessories successfully assigned!");
-      router.refresh(); // Refresh server props to get all updated data
+      toast.success("Asset and accessories assigned!");
+      router.refresh();
     }
     setIsAssigning(false);
   };
@@ -68,19 +64,15 @@ export default function AssetDetailPage({
       return;
     }
     setIsAssociating(true);
-
-    const { data, error } = await supabase
-      .from("assets")
-      .update({ parent_asset_id: asset.id })
-      .eq("id", selectedChildId)
-      .select("id, system_id, model")
-      .single();
-
+    const { error } = await supabase.rpc("associate_child_asset", {
+      p_parent_id: asset.id,
+      p_child_id: selectedChildId,
+    });
     if (error) {
       toast.error(`Failed to associate asset: ${error.message}`);
-    } else if (data) {
+    } else {
       toast.success("Asset associated successfully!");
-      router.refresh(); // Easiest way to update both child and available lists
+      router.refresh();
     }
     setIsAssociating(false);
   };
@@ -88,20 +80,13 @@ export default function AssetDetailPage({
   const handleDisassociate = async () => {
     if (
       !window.confirm(
-        "Are you sure you want to disassociate this item from its parent kit? It will be returned to stores and unassigned."
+        "Are you sure? This will return the item to stores and unassign it."
       )
     )
       return;
-
-    const { error } = await supabase
-      .from("assets")
-      .update({
-        parent_asset_id: null,
-        current_assignee_id: null,
-        status: "In Stores",
-      })
-      .eq("id", asset.id);
-
+    const { error } = await supabase.rpc("disassociate_child_asset", {
+      p_child_id: asset.id,
+    });
     if (error) {
       toast.error(`Failed to disassociate: ${error.message}`);
     } else {
@@ -111,14 +96,12 @@ export default function AssetDetailPage({
   };
 
   const currentAssigneeName =
-    `${asset.assignee?.first_name || ""} ${asset.assignee?.last_name || ""}`.trim();
+    `${asset.assignee_first_name || ""} ${asset.assignee_last_name || ""}`.trim();
 
-  // --- Calibration Logic ---
   let nextDueDate: Date | null = null;
-  let calibStatus: "ok" | "due" | "overdue" | "n/a" = "n/a";
+  let statusText = "N/A";
   let statusColor = "text-gray-500";
   let StatusIcon = Calendar;
-  let statusText = "N/A";
 
   if (asset.last_calibrated_date && asset.calibration_cycle_months) {
     const lastCalib = new Date(asset.last_calibrated_date);
@@ -127,25 +110,20 @@ export default function AssetDetailPage({
         lastCalib.getMonth() + asset.calibration_cycle_months
       )
     );
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(today.getDate() + 30);
 
     if (nextDueDate < today) {
-      calibStatus = "overdue";
       statusText = "Overdue";
       statusColor = "text-red-600";
       StatusIcon = AlertTriangle;
     } else if (nextDueDate < thirtyDaysFromNow) {
-      calibStatus = "due";
       statusText = "Due Soon";
       statusColor = "text-amber-600";
       StatusIcon = AlertTriangle;
     } else {
-      calibStatus = "ok";
       statusText = "OK";
       statusColor = "text-green-600";
       StatusIcon = CheckCircle;
@@ -170,20 +148,14 @@ export default function AssetDetailPage({
           <span className="text-gray-700">{asset.system_id}</span>
         </div>
 
-        {asset.parent && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
+        {asset.parent_asset_id && (
+          <div className="mb-6 p-4 bg-blue-50 rounded-lg flex justify-between items-center">
             <div className="flex items-center">
               <Link2 className="h-5 w-5 mr-3 text-blue-600" />
               <div>
                 <p className="text-sm font-medium text-blue-800">
-                  Associated with Parent Kit
+                  This item is an accessory for another asset.
                 </p>
-                <Link
-                  href={`/dashboard/assets/${asset.parent.id}`}
-                  className="text-sm text-blue-600 hover:underline font-semibold"
-                >
-                  {asset.parent.system_id}
-                </Link>
               </div>
             </div>
             {isCurrentUserAdmin && (
@@ -206,7 +178,7 @@ export default function AssetDetailPage({
                   {asset.manufacturer} {asset.model}
                 </h1>
                 <p className="text-lg text-gray-500">
-                  {asset.category?.name || "Uncategorized"}
+                  {asset.category_name || "Uncategorized"}
                 </p>
               </div>
               <div className="pt-4 space-y-2 text-sm">
