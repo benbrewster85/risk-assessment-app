@@ -11,6 +11,7 @@ export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // Check URL for ?view=sign_up, otherwise default to the start
   const initialView =
     searchParams.get("view") === "sign_up" ? "sign_up" : "enter_email";
   const [view, setView] = useState<"sign_in" | "sign_up" | "enter_email">(
@@ -18,7 +19,6 @@ export default function LoginForm() {
   );
 
   const [isLoading, setIsLoading] = useState(false);
-
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -67,9 +67,7 @@ export default function LoginForm() {
       email,
       password,
     });
-    if (error) {
-      toast.error(error.message);
-    }
+    if (error) toast.error(error.message);
     setIsLoading(false);
   };
 
@@ -89,7 +87,7 @@ export default function LoginForm() {
       );
     } else {
       toast.success(
-        "Success! Please check your email for a confirmation link to complete your sign-up."
+        "Success! Please check your email for a confirmation link."
       );
       setView("enter_email");
       setEmail("");
@@ -132,7 +130,6 @@ export default function LoginForm() {
             </button>
           </form>
         )}
-
         {view === "sign_in" && (
           <form onSubmit={handleSignIn}>
             <h2 className="text-center text-3xl font-extrabold text-gray-900 mb-6">
@@ -193,7 +190,6 @@ export default function LoginForm() {
             </button>
           </form>
         )}
-
         {view === "sign_up" && (
           <form onSubmit={handleSignUp} className="space-y-4">
             <h2 className="text-center text-3xl font-extrabold text-gray-900 mb-6">

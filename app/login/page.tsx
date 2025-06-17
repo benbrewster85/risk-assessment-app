@@ -1,11 +1,11 @@
 import { Suspense } from "react";
 import LoginForm from "@/components/LoginForm";
 
-// A simple loading component to show while Suspense is waiting
+// This is a simple UI to show while the main component is loading
 function Loading() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p>Loading...</p>
+      <p className="text-gray-500">Loading...</p>
     </div>
   );
 }
