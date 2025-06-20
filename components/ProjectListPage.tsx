@@ -20,7 +20,7 @@ export default function ProjectListPage({
   teamId,
 }: ProjectListPageProps) {
   const supabase = createClient();
-  const [projects] = useState(initialProjects);
+  const [projects, setProjects] = useState(initialProjects);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<ProjectListItem | null>(
     null
@@ -28,10 +28,12 @@ export default function ProjectListPage({
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(
     null
   );
+
   const [projectName, setProjectName] = useState("");
   const [projectReference, setProjectReference] = useState("");
   const [projectAddress, setProjectAddress] = useState("");
   const [projectW3W, setNewProjectW3W] = useState("");
+
   const isEditing = editingProject !== null;
 
   useEffect(() => {
@@ -44,16 +46,80 @@ export default function ProjectListPage({
   }, [isEditing, editingProject]);
 
   const openCreateModal = () => {
-    /* ... */
+    setEditingProject(null);
+    setProjectName("");
+    setProjectReference("");
+    setProjectAddress("");
+    setNewProjectW3W("");
+    setIsModalOpen(true);
   };
+
   const openEditModal = (project: ProjectListItem) => {
-    /* ... */
+    setEditingProject(project);
+    setIsModalOpen(true);
   };
+
   const handleProjectSubmit = async (e: React.FormEvent) => {
-    /* ... */
+    e.preventDefault();
+    if (!projectName) {
+      toast.error("Project name is required.");
+      return;
+    }
+
+    const insertData = {
+      name: projectName,
+      reference: projectReference || null,
+      location_address: projectAddress || null,
+      location_what3words: projectW3W || null,
+      team_id: teamId,
+    };
+    const updateData = {
+      name: projectName,
+      reference: projectReference || null,
+    };
+
+    const { data: updatedProject, error } = isEditing
+      ? await supabase
+          .from("projects")
+          .update(updateData)
+          .eq("id", editingProject!.id)
+          .select("id, name, reference, last_edited_at")
+          .single()
+      : await supabase
+          .from("projects")
+          .insert(insertData)
+          .select("id, name, reference, last_edited_at")
+          .single();
+    if (error) {
+      toast.error(`Failed to save project: ${error.message}`);
+    } else if (updatedProject) {
+      toast.success(
+        `Project ${isEditing ? "updated" : "created"} successfully!`
+      );
+      if (isEditing) {
+        setProjects(
+          projects.map((p) => (p.id === updatedProject.id ? updatedProject : p))
+        );
+      } else {
+        setProjects([updatedProject, ...projects]);
+      }
+      setIsModalOpen(false);
+    }
   };
+
   const handleDeleteProject = async () => {
-    /* ... */
+    if (!deletingProjectId) return;
+    const { error } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", deletingProjectId);
+    if (error) {
+      toast.error(`Failed to delete project: ${error.message}`);
+    } else {
+      toast.success("Project deleted.");
+      setProjects(projects.filter((p) => p.id !== deletingProjectId));
+    }
+    setDeletingProjectId(null);
   };
 
   return (
@@ -65,32 +131,28 @@ export default function ProjectListPage({
       >
         <form onSubmit={handleProjectSubmit} className="space-y-4">
           <div>
-            <label
-              htmlFor="projectName"
-              className="block text-sm font-medium text-gray-700"
-            >
+            <label htmlFor="projectName" className="block text-sm font-medium">
               Project Name
             </label>
             <input
-              type="text"
               id="projectName"
+              type="text"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
               required
+              className="mt-1 block w-full"
             />
           </div>
           <div>
-            <label
-              htmlFor="projectRef"
-              className="block text-sm font-medium text-gray-700"
-            >
+            <label htmlFor="projectRef" className="block text-sm font-medium">
               Reference (Optional)
             </label>
             <input
-              type="text"
               id="projectRef"
+              type="text"
               value={projectReference}
               onChange={(e) => setProjectReference(e.target.value)}
+              className="mt-1 block w-full"
             />
           </div>
           {!isEditing && (
@@ -98,7 +160,7 @@ export default function ProjectListPage({
               <div>
                 <label
                   htmlFor="projectAddress"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-medium"
                 >
                   Site Address (Optional)
                 </label>
@@ -107,20 +169,22 @@ export default function ProjectListPage({
                   value={projectAddress}
                   onChange={(e) => setProjectAddress(e.target.value)}
                   rows={3}
+                  className="mt-1 block w-full"
                 />
               </div>
               <div>
                 <label
                   htmlFor="projectW3W"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-medium"
                 >
                   what3words Address (Optional)
                 </label>
                 <input
-                  type="text"
                   id="projectW3W"
+                  type="text"
                   value={projectW3W}
                   onChange={(e) => setNewProjectW3W(e.target.value)}
+                  className="mt-1 block w-full"
                   placeholder="e.g. ///filled.count.soap"
                 />
               </div>
@@ -130,7 +194,7 @@ export default function ProjectListPage({
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="mr-2 py-2 px-4 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="mr-2 py-2 px-4 border rounded-md"
             >
               Cancel
             </button>
@@ -214,9 +278,7 @@ export default function ProjectListPage({
               </div>
             ) : (
               <div className="text-center py-12">
-                <h3 className="text-xl font-medium text-gray-700">
-                  No projects yet.
-                </h3>
+                <h3 className="text-xl font-medium">No projects yet.</h3>
                 {currentUserRole === "team_admin" && (
                   <p className="text-gray-500 mt-2">
                     Get started by creating your first project.

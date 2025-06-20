@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import type { Team } from "@/lib/types";
@@ -70,10 +70,7 @@ export default function TeamSettingsTab({ team }: TeamSettingsTabProps) {
       className="bg-white p-6 rounded-lg shadow space-y-6"
     >
       <div>
-        <label
-          htmlFor="teamName"
-          className="block text-sm font-medium text-gray-700"
-        >
+        <label htmlFor="teamName" className="block text-sm font-medium">
           Team Name
         </label>
         <input
@@ -82,13 +79,11 @@ export default function TeamSettingsTab({ team }: TeamSettingsTabProps) {
           value={teamName}
           onChange={(e) => setTeamName(e.target.value)}
           required
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+          className="mt-1 block w-full"
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700">
-          Team Logo
-        </label>
+        <label className="block text-sm font-medium">Team Logo</label>
         <div className="mt-2 flex items-center space-x-4">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
