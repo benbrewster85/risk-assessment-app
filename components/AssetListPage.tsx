@@ -235,7 +235,7 @@ export default function AssetListPage({
         onClose={() => setDeletingAsset(null)}
         onConfirm={handleDelete}
         title="Delete Asset"
-        message={`Are you sure you want to delete the asset "${deletingAsset?.system_id} - ${deletingAsset?.model}"?`}
+        message={`Are you sure you want to delete the asset '${deletingAsset?.system_id} - ${deletingAsset?.model}"?`}
         confirmText="Delete"
         isDestructive={true}
       />

@@ -13,7 +13,6 @@ export default function SuperAdminPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [newTeamName, setNewTeamName] = useState("");
 
-  // State for the invitation modal
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [invitingToTeam, setInvitingToTeam] = useState<Team | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -57,6 +56,7 @@ export default function SuperAdminPage() {
       toast.error("New team name cannot be empty.");
       return;
     }
+
     const { data: newTeam, error } = await supabase
       .from("teams")
       .insert({ name: newTeamName })
@@ -89,7 +89,7 @@ export default function SuperAdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         inviteeEmail: inviteEmail,
-        role: "team_admin", // Hardcoded to invite an admin
+        role: "team_admin",
         teamId: invitingToTeam.id,
       }),
     });
@@ -114,7 +114,7 @@ export default function SuperAdminPage() {
   return (
     <>
       <Modal
-        title={`Invite Admin for ${invitingToTeam?.name}`}
+        title={`Invite Admin for ${invitingToTeam?.name || ""}`}
         isOpen={isInviteModalOpen}
         onClose={() => setIsInviteModalOpen(false)}
       >

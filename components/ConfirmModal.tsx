@@ -22,11 +22,9 @@ export default function ConfirmModal({
   isDestructive = false,
 }: ConfirmModalProps) {
   if (!isOpen) return null;
-
   const confirmButtonClasses = isDestructive
     ? "bg-red-600 hover:bg-red-700"
     : "bg-blue-600 hover:bg-blue-700";
-
   return (
     <Modal title={title} isOpen={isOpen} onClose={onClose}>
       <div className="space-y-4">
