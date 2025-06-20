@@ -14,11 +14,13 @@ import { AlertTriangle, CheckCircle, Download } from "react-feather";
 import Papa from "papaparse";
 
 type Category = { id: string; name: string };
+type Status = { id: string; name: string };
 
 type AssetListPageProps = {
   initialAssets: Asset[];
   categories: Category[];
   teamMembers: TeamMember[];
+  assetStatuses: Status[];
   teamId: string | null;
   isCurrentUserAdmin: boolean;
 };
@@ -51,6 +53,7 @@ export default function AssetListPage({
   initialAssets,
   categories,
   teamMembers,
+  assetStatuses,
   teamId,
   isCurrentUserAdmin,
 }: AssetListPageProps) {
@@ -66,6 +69,7 @@ export default function AssetListPage({
   const [categoryFilter, setCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
+  const [calibrationFilter, setCalibrationFilter] = useState("");
 
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(
     new Set()
@@ -74,16 +78,7 @@ export default function AssetListPage({
   const [bulkAssignCategoryId, setBulkAssignCategoryId] = useState("");
 
   const handleSuccess = (resultAsset: Asset) => {
-    if (editingAsset) {
-      setAssets(
-        assets.map((asset) =>
-          asset.id === resultAsset.id ? resultAsset : asset
-        )
-      );
-    } else {
-      setAssets((currentAssets) => [resultAsset, ...currentAssets]);
-    }
-    setEditingAsset(null);
+    router.refresh();
   };
 
   const openCreateModal = () => {
@@ -156,34 +151,24 @@ export default function AssetListPage({
   };
 
   const filteredAssets = useMemo(() => {
-    let items = [...assets];
-    if (categoryFilter) {
-      items = items.filter((asset) => asset.category_id === categoryFilter);
-    }
-    if (statusFilter) {
-      items = items.filter((asset) => asset.status === statusFilter);
-    }
-    if (assigneeFilter) {
-      if (assigneeFilter === "unassigned") {
-        items = items.filter(
-          (asset) => !asset.current_assignee_id && !asset.parent_asset_id
-        );
-      } else {
-        const directlyAssignedAssetIds = new Set(
-          assets
-            .filter((a) => a.current_assignee_id === assigneeFilter)
-            .map((a) => a.id)
-        );
-        items = items.filter(
-          (asset) =>
-            asset.current_assignee_id === assigneeFilter ||
-            (asset.parent_asset_id &&
-              directlyAssignedAssetIds.has(asset.parent_asset_id))
-        );
-      }
-    }
-    return items;
-  }, [assets, categoryFilter, statusFilter, assigneeFilter]);
+    return assets.filter((asset) => {
+      const categoryMatch =
+        !categoryFilter || asset.category_id === categoryFilter;
+      const statusMatch = !statusFilter || asset.status_id === statusFilter;
+      const assigneeMatch = !assigneeFilter
+        ? true
+        : assigneeFilter === "unassigned"
+          ? !asset.current_assignee_id && !asset.parent_asset_id
+          : asset.current_assignee_id === assigneeFilter ||
+            assets.find((p) => p.id === asset.parent_asset_id)
+              ?.current_assignee_id === assigneeFilter;
+      const calibrationMatch =
+        !calibrationFilter ||
+        getCalibrationStatus(asset).text === calibrationFilter;
+
+      return categoryMatch && statusMatch && assigneeMatch && calibrationMatch;
+    });
+  }, [assets, categoryFilter, statusFilter, assigneeFilter, calibrationFilter]);
 
   const handleSelectOne = (assetId: string) => {
     setSelectedAssetIds((prev) => {
@@ -219,7 +204,6 @@ export default function AssetListPage({
       .from("assets")
       .update({ category_id: bulkAssignCategoryId })
       .in("id", Array.from(selectedAssetIds));
-
     if (error) {
       toast.error(`Failed to update assets: ${error.message}`);
     } else {
@@ -233,13 +217,7 @@ export default function AssetListPage({
   const isAllSelected =
     selectedAssetIds.size > 0 &&
     selectedAssetIds.size === filteredAssets.length;
-  const assetStatuses = [
-    "In Stores",
-    "On Site",
-    "In Repair",
-    "Missing",
-    "Sold",
-  ];
+  const calibFilterOptions = ["OK", "Due Soon", "Overdue"];
 
   return (
     <>
@@ -249,6 +227,7 @@ export default function AssetListPage({
         onSuccess={handleSuccess}
         teamId={teamId}
         categories={categories}
+        assetStatuses={assetStatuses}
         assetToEdit={editingAsset}
       />
       <ConfirmModal
@@ -278,7 +257,7 @@ export default function AssetListPage({
               id="bulkCategory"
               value={bulkAssignCategoryId}
               onChange={(e) => setBulkAssignCategoryId(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+              className="mt-1 block w-full"
               required
             >
               <option value="" disabled>
@@ -294,14 +273,14 @@ export default function AssetListPage({
           <div className="mt-6 flex justify-end">
             <button
               type="button"
-              onClick={() => setIsBulkAssignModalOpen(false)}
-              className="mr-2 py-2 px-4 border border-gray-300 rounded-md"
+              onClick={() => setIsModalOpen(false)}
+              className="mr-2 py-2 px-4 border rounded-md"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="py-2 px-4 border rounded-md text-white bg-blue-600 hover:bg-blue-700"
+              className="py-2 px-4 border rounded-md text-white bg-blue-600"
             >
               Apply Category
             </button>
@@ -376,7 +355,7 @@ export default function AssetListPage({
                   id="categoryFilter"
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                  className="mt-1 block w-full"
                 >
                   <option value="">All Categories</option>
                   {categories.map((cat) => (
@@ -397,12 +376,12 @@ export default function AssetListPage({
                   id="statusFilter"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                  className="mt-1 block w-full"
                 >
                   <option value="">All Statuses</option>
                   {assetStatuses.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
+                    <option key={status.id} value={status.id}>
+                      {status.name}
                     </option>
                   ))}
                 </select>
@@ -418,7 +397,7 @@ export default function AssetListPage({
                   id="assigneeFilter"
                   value={assigneeFilter}
                   onChange={(e) => setAssigneeFilter(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                  className="mt-1 block w-full"
                 >
                   <option value="">All Users</option>
                   <option value="unassigned">(In Stores)</option>
@@ -427,6 +406,27 @@ export default function AssetListPage({
                       key={member.id}
                       value={member.id}
                     >{`${member.first_name} ${member.last_name}`}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label
+                  htmlFor="calibFilter"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Calibration
+                </label>
+                <select
+                  id="calibFilter"
+                  value={calibrationFilter}
+                  onChange={(e) => setCalibrationFilter(e.target.value)}
+                  className="mt-1 block w-full"
+                >
+                  <option value="">All</option>
+                  {calibFilterOptions.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -439,25 +439,25 @@ export default function AssetListPage({
                   <th className="px-6 py-3">
                     <input
                       type="checkbox"
-                      className="h-4 w-4 rounded border-gray-300"
+                      className="h-4 w-4"
                       checked={isAllSelected}
                       onChange={handleSelectAll}
                       disabled={filteredAssets.length === 0}
                     />
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     System ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     Details
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     Assigned To
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     Calibration
                   </th>
                   <th className="relative px-6 py-3">
@@ -483,7 +483,7 @@ export default function AssetListPage({
                       <td className="px-6 py-4">
                         <input
                           type="checkbox"
-                          className="h-4 w-4 rounded border-gray-300"
+                          className="h-4 w-4"
                           checked={selectedAssetIds.has(asset.id)}
                           onChange={() => handleSelectOne(asset.id)}
                         />

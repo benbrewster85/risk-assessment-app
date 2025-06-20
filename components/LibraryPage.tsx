@@ -4,12 +4,19 @@ import { useState } from "react";
 import LibraryManager from "./LibraryManager";
 import { TeamMember, AssetCategory } from "@/lib/types";
 
-type LibraryItem = { id: string; name: string };
+type LibraryItem = {
+  id: string;
+  name: string;
+  is_system_status?: boolean;
+  owner_id?: string | null;
+  owner?: { first_name: string | null; last_name: string | null } | null;
+};
 
 type LibraryPageProps = {
   hazards: LibraryItem[];
   risks: LibraryItem[];
   assetCategories: AssetCategory[];
+  assetStatuses: LibraryItem[];
   teamMembers: TeamMember[];
   teamId: string | null;
 };
@@ -18,37 +25,46 @@ export default function LibraryPage({
   hazards,
   risks,
   assetCategories,
+  assetStatuses,
   teamMembers,
   teamId,
 }: LibraryPageProps) {
   const [activeAssetType, setActiveAssetType] = useState<
-    "hazards" | "risks" | "categories"
+    "hazards" | "risks" | "categories" | "statuses"
   >("hazards");
+
+  const buttonClass = (type: string) =>
+    `whitespace-nowrap py-2 px-4 text-sm font-medium rounded-t-lg ${activeAssetType === type ? "bg-white border-gray-200 border-l border-t border-r" : "bg-gray-50 hover:bg-gray-100"}`;
 
   return (
     <div>
-      <div className="flex space-x-4 border-b border-gray-200 mb-6">
+      <div className="flex space-x-2 border-b border-gray-200">
         <button
           onClick={() => setActiveAssetType("hazards")}
-          className={`py-2 px-4 text-sm font-medium ${activeAssetType === "hazards" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500 hover:text-gray-700"}`}
+          className={buttonClass("hazards")}
         >
           Hazards
         </button>
         <button
           onClick={() => setActiveAssetType("risks")}
-          className={`py-2 px-4 text-sm font-medium ${activeAssetType === "risks" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500 hover:text-gray-700"}`}
+          className={buttonClass("risks")}
         >
           Risks
         </button>
-        {/* NEW: Button for Asset Categories */}
         <button
           onClick={() => setActiveAssetType("categories")}
-          className={`py-2 px-4 text-sm font-medium ${activeAssetType === "categories" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500 hover:text-gray-700"}`}
+          className={buttonClass("categories")}
         >
           Asset Categories
         </button>
+        <button
+          onClick={() => setActiveAssetType("statuses")}
+          className={buttonClass("statuses")}
+        >
+          Asset Statuses
+        </button>
       </div>
-      <div>
+      <div className="-mt-px">
         {activeAssetType === "hazards" && (
           <LibraryManager
             itemType="Hazard"
@@ -67,7 +83,6 @@ export default function LibraryPage({
             teamId={teamId}
           />
         )}
-        {/* NEW: Render the manager for Asset Categories */}
         {activeAssetType === "categories" && (
           <LibraryManager
             itemType="Asset Category"
@@ -75,8 +90,17 @@ export default function LibraryPage({
             tableName="asset_categories"
             initialItems={assetCategories}
             teamId={teamId}
-            teamMembers={teamMembers} // Pass team members for the owner dropdown
-            showOwner={true} // Tell the manager to show the owner UI
+            teamMembers={teamMembers}
+            showOwner={true}
+          />
+        )}
+        {activeAssetType === "statuses" && (
+          <LibraryManager
+            itemType="Status"
+            itemTypePlural="Asset Statuses"
+            tableName="asset_statuses"
+            initialItems={assetStatuses}
+            teamId={teamId}
           />
         )}
       </div>

@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "Risk Assessment Platform",
-  description: "Create and manage risk assessments easily.",
+  title: "Zubete",
+  description: "Manage your Team with Zubete",
 };
 
 export default function RootLayout({

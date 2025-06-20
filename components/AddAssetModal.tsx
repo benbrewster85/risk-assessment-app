@@ -7,6 +7,7 @@ import Modal from "./Modal";
 import { Asset } from "@/lib/types";
 
 type Category = { id: string; name: string };
+type Status = { id: string; name: string };
 
 type AddAssetModalProps = {
   isOpen: boolean;
@@ -14,6 +15,7 @@ type AddAssetModalProps = {
   onSuccess: (resultAsset: Asset) => void;
   teamId: string | null;
   categories: Category[];
+  assetStatuses: Status[];
   assetToEdit: Asset | null;
 };
 
@@ -23,6 +25,7 @@ export default function AddAssetModal({
   onSuccess,
   teamId,
   categories,
+  assetStatuses,
   assetToEdit,
 }: AddAssetModalProps) {
   const supabase = createClient();
@@ -31,13 +34,22 @@ export default function AddAssetModal({
   const [model, setModel] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // NEW: State for calibration fields
+  const [statusId, setStatusId] = useState(""); // Changed from status to statusId
   const [lastCalibrated, setLastCalibrated] = useState("");
   const [calibCycle, setCalibCycle] = useState<number | "">("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEditing = assetToEdit !== null;
+
+  const calibrationCycles = [
+    { label: "Not Required", value: "" },
+    { label: "1 Month", value: 1 },
+    { label: "3 Months", value: 3 },
+    { label: "6 Months", value: 6 },
+    { label: "1 Year", value: 12 },
+    { label: "2 Years", value: 24 },
+    { label: "3 Years", value: 36 },
+  ];
 
   useEffect(() => {
     if (assetToEdit) {
@@ -46,19 +58,22 @@ export default function AddAssetModal({
       setModel(assetToEdit.model || "");
       setSerialNumber(assetToEdit.serial_number || "");
       setCategoryId(assetToEdit.category_id || "");
+      setStatusId(assetToEdit.status_id || ""); // Use status_id
       setLastCalibrated(assetToEdit.last_calibrated_date || "");
       setCalibCycle(assetToEdit.calibration_cycle_months || "");
     } else {
-      // Reset form for new entry
+      // Find the default "In Stores" status ID
+      const defaultStatus = assetStatuses.find((s) => s.name === "In Stores");
       setSystemId("");
       setManufacturer("");
       setModel("");
       setSerialNumber("");
       setCategoryId("");
+      setStatusId(defaultStatus?.id || "");
       setLastCalibrated("");
       setCalibCycle("");
     }
-  }, [assetToEdit, isOpen]);
+  }, [assetToEdit, isOpen, assetStatuses]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +90,7 @@ export default function AddAssetModal({
       serial_number: serialNumber,
       category_id: categoryId || null,
       team_id: teamId,
+      status_id: statusId || null,
       last_calibrated_date: lastCalibrated || null,
       calibration_cycle_months: calibCycle === "" ? null : Number(calibCycle),
     };
@@ -106,15 +122,6 @@ export default function AddAssetModal({
     setIsSubmitting(false);
   };
 
-  const calibrationCycles = [
-    { label: "1 Month", value: 1 },
-    { label: "3 Months", value: 3 },
-    { label: "6 Months", value: 6 },
-    { label: "1 Year", value: 12 },
-    { label: "2 Years", value: 24 },
-    { label: "3 Years", value: 36 },
-  ];
-
   return (
     <Modal
       title={isEditing ? "Edit Asset" : "Add New Asset"}
@@ -133,8 +140,25 @@ export default function AddAssetModal({
               value={systemId}
               onChange={(e) => setSystemId(e.target.value)}
               required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
             />
+          </div>
+          <div>
+            <label htmlFor="status" className="block text-sm font-medium">
+              Status
+            </label>
+            <select
+              id="status"
+              value={statusId}
+              onChange={(e) => setStatusId(e.target.value)}
+              className="mt-1 block w-full"
+            >
+              <option value="">(No Status)</option>
+              {assetStatuses.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label htmlFor="category" className="block text-sm font-medium">
@@ -144,7 +168,6 @@ export default function AddAssetModal({
               id="category"
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
             >
               <option value="">(No Category)</option>
               {categories.map((cat) => (
@@ -163,7 +186,6 @@ export default function AddAssetModal({
               id="manufacturer"
               value={manufacturer}
               onChange={(e) => setManufacturer(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
             />
           </div>
           <div>
@@ -175,23 +197,20 @@ export default function AddAssetModal({
               id="model"
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="serialNumber" className="block text-sm font-medium">
+              Serial Number
+            </label>
+            <input
+              type="text"
+              id="serialNumber"
+              value={serialNumber}
+              onChange={(e) => setSerialNumber(e.target.value)}
             />
           </div>
         </div>
-        <div>
-          <label htmlFor="serialNumber" className="block text-sm font-medium">
-            Serial Number
-          </label>
-          <input
-            type="text"
-            id="serialNumber"
-            value={serialNumber}
-            onChange={(e) => setSerialNumber(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-          />
-        </div>
-
         <div className="border-t pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label
@@ -205,7 +224,6 @@ export default function AddAssetModal({
               id="lastCalibrated"
               value={lastCalibrated}
               onChange={(e) => setLastCalibrated(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
             />
           </div>
           <div>
@@ -220,9 +238,7 @@ export default function AddAssetModal({
                   e.target.value === "" ? "" : Number(e.target.value)
                 )
               }
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
             >
-              <option value="">(Not Required)</option>
               {calibrationCycles.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}
@@ -231,19 +247,18 @@ export default function AddAssetModal({
             </select>
           </div>
         </div>
-
         <div className="mt-6 flex justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="mr-2 py-2 px-4 border border-gray-300 rounded-md"
+            className="mr-2 py-2 px-4 border rounded-md"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="py-2 px-4 border rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
+            className="py-2 px-4 border rounded-md text-white bg-blue-600 hover:bg-blue-700"
           >
             {isSubmitting
               ? "Saving..."

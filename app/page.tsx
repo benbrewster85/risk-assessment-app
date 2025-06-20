@@ -15,7 +15,7 @@ export default function SplashPage() {
 
         {/* Headline */}
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-slate-900">
-          Integrated Team Operations Platform
+          Welcome to Zubete
         </h1>
 
         {/* Subheading / Value Proposition */}
@@ -38,10 +38,7 @@ export default function SplashPage() {
 
       {/* A simple footer */}
       <footer className="absolute bottom-6 text-xs text-slate-500">
-        <p>
-          &copy; {new Date().getFullYear()} Your Company Name. All rights
-          reserved.
-        </p>
+        <p>&copy; {new Date().getFullYear()} Zubete. All rights reserved.</p>
       </footer>
     </div>
   );

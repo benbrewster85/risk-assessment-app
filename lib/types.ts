@@ -95,6 +95,7 @@ export type AssetCategory = {
     } | null;
 };
 
+// UPDATED: This type now correctly matches our database view
 export type Asset = {
     id: string;
     system_id: string;
@@ -102,13 +103,14 @@ export type Asset = {
     manufacturer: string | null;
     model: string | null;
     serial_number: string | null;
-    status: string;
+    status: string | null; // This is now the status NAME from the joined table
     created_at: string;
     category_id: string | null;
     current_assignee_id: string | null;
     parent_asset_id: string | null;
     last_calibrated_date: string | null;
     calibration_cycle_months: number | null;
+    status_id: string | null; // The foreign key ID
     category_name: string | null;
     assignee_first_name: string | null;
     assignee_last_name: string | null;
@@ -116,21 +118,27 @@ export type Asset = {
     parent_assignee_last_name: string | null;
 };
 
-// These are the types required for the report that are currently missing
-export type ReportSignatory = {
-    profiles: {
-        first_name: string | null;
-        last_name: string | null;
-        role: string;
-        id: string;
-    } | null;
-};
+// Add these new types to your file
 
-export type ReportSignature = {
-    signed_at: string;
-    profiles: {
+export type AssetIssue = {
+    id: string;
+    created_at: string;
+    log_notes: string;
+    log_type: string;
+    event_date: string | null;
+    status: string;
+    resolution_notes: string | null;
+    resolved_at: string | null;
+    reporter: {
         first_name: string | null;
         last_name: string | null;
-        id: string;
     } | null;
+    resolver: {
+        first_name: string | null;
+        last_name: string | null;
+    } | null;
+    photos: {
+        id: string;
+        file_path: string;
+    }[];
 };

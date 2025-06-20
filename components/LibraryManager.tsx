@@ -15,12 +15,13 @@ type LibraryItem = {
     first_name: string | null;
     last_name: string | null;
   } | null;
+  is_system_status?: boolean;
 };
 
 type LibraryManagerProps = {
   itemType: string;
   itemTypePlural: string;
-  tableName: "hazards" | "risks" | "asset_categories";
+  tableName: "hazards" | "risks" | "asset_categories" | "asset_statuses";
   initialItems: LibraryItem[];
   teamId: string | null;
   teamMembers?: TeamMember[];
@@ -42,7 +43,7 @@ export default function LibraryManager({
   const [editingItem, setEditingItem] = useState<LibraryItem | null>(null);
   const [itemName, setItemName] = useState("");
   const [ownerId, setOwnerId] = useState<string | null>("");
-  const [deletingItem, setDeletingItem] = useState<LibraryItem | null>(null);
+  const [archivingItem, setArchivingItem] = useState<LibraryItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEditing = editingItem !== null;
@@ -58,6 +59,7 @@ export default function LibraryManager({
     setIsModalOpen(true);
   };
 
+  // UPDATED: This function is now more explicit to avoid type errors
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!itemName) {
@@ -78,26 +80,30 @@ export default function LibraryManager({
       itemData.owner_id = ownerId || null;
     }
 
-    const { data, error } = isEditing
-      ? await supabase
-          .from(tableName)
-          .update(itemData)
-          .eq("id", editingItem!.id)
-          .select("*, owner:profiles(first_name, last_name)")
-          .single()
-      : await supabase
-          .from(tableName)
-          .insert(itemData)
-          .select("*, owner:profiles(first_name, last_name)")
-          .single();
+    let query;
+    const baseQuery = isEditing
+      ? supabase.from(tableName).update(itemData).eq("id", editingItem!.id)
+      : supabase.from(tableName).insert(itemData);
+
+    if (showOwner) {
+      query = baseQuery
+        .select("*, owner:profiles(first_name, last_name)")
+        .single();
+    } else {
+      query = baseQuery.select("*").single();
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       toast.error(`Failed to save ${itemType.toLowerCase()}: ${error.message}`);
     } else if (data) {
-      const transformedData = {
-        ...data,
-        owner: Array.isArray(data.owner) ? data.owner[0] : data.owner,
-      };
+      const transformedData = data.owner
+        ? {
+            ...data,
+            owner: Array.isArray(data.owner) ? data.owner[0] : data.owner,
+          }
+        : data;
       toast.success(
         `${itemType} ${isEditing ? "updated" : "added"} successfully!`
       );
@@ -116,37 +122,38 @@ export default function LibraryManager({
   };
 
   const handleArchive = async () => {
-    if (!deletingItem) return;
+    if (!archivingItem) return;
+
     const { error } = await supabase
       .from(tableName)
-      .update({ is_archived: true })
-      .eq("id", deletingItem.id);
+      .delete()
+      .eq("id", archivingItem.id);
     if (error) {
       if (error.code === "23503") {
         toast.error(
-          `Cannot archive "${deletingItem.name}" because it is in use.`
+          `Cannot delete "${archivingItem.name}" because it is currently in use.`
         );
       } else {
         toast.error(
-          `Failed to archive ${itemType.toLowerCase()}: ${error.message}`
+          `Failed to delete ${itemType.toLowerCase()}: ${error.message}`
         );
       }
     } else {
-      toast.success(`${itemType} archived.`);
-      setItems(items.filter((item) => item.id !== deletingItem.id));
+      toast.success(`${itemType} deleted.`);
+      setItems(items.filter((item) => item.id !== archivingItem.id));
     }
-    setDeletingItem(null);
+    setArchivingItem(null);
   };
 
   return (
     <div className="bg-white p-6 rounded-lg shadow">
       <ConfirmModal
-        isOpen={deletingItem !== null}
-        onClose={() => setDeletingItem(null)}
+        isOpen={archivingItem !== null}
+        onClose={() => setArchivingItem(null)}
         onConfirm={handleArchive}
-        title={`Archive ${itemType}`}
-        message={`Are you sure you want to archive "${deletingItem?.name}"? It will be hidden from dropdown lists but will remain in old risk assessments for historical accuracy.`}
-        confirmText="Archive"
+        title={`Delete ${itemType}`}
+        message={`Are you sure you want to delete "${archivingItem?.name}"? This will not affect existing records, but it will be removed as an option for future use.`}
+        confirmText="Delete"
         isDestructive={true}
       />
       <Modal
@@ -240,6 +247,11 @@ export default function LibraryManager({
             >
               <div>
                 <span className="font-medium">{item.name}</span>
+                {item.is_system_status && (
+                  <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
+                    System
+                  </span>
+                )}
                 {showOwner && (
                   <p className="text-xs text-gray-500">Owner: {ownerName}</p>
                 )}
@@ -247,15 +259,17 @@ export default function LibraryManager({
               <div className="space-x-4">
                 <button
                   onClick={() => openModal(item)}
-                  className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+                  disabled={item.is_system_status}
+                  className="text-sm font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Edit
                 </button>
                 <button
-                  onClick={() => setDeletingItem(item)}
-                  className="text-sm font-medium text-red-600 hover:text-red-800"
+                  onClick={() => setArchivingItem(item)}
+                  disabled={item.is_system_status}
+                  className="text-sm font-medium text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Archive
+                  Delete
                 </button>
               </div>
             </li>

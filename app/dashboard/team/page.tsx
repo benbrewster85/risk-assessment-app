@@ -7,6 +7,8 @@ import { toast } from "react-hot-toast";
 import LibraryPage from "@/components/LibraryPage";
 import TeamSettingsTab from "@/components/TeamSettingsTab";
 
+type LibraryItem = { id: string; name: string; is_system_status?: boolean };
+
 export default function TeamPage() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
@@ -14,9 +16,10 @@ export default function TeamPage() {
 
   const [team, setTeam] = useState<Team | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [hazards, setHazards] = useState<{ id: string; name: string }[]>([]);
-  const [risks, setRisks] = useState<{ id: string; name: string }[]>([]);
+  const [hazards, setHazards] = useState<LibraryItem[]>([]);
+  const [risks, setRisks] = useState<LibraryItem[]>([]);
   const [assetCategories, setAssetCategories] = useState<AssetCategory[]>([]);
+  const [assetStatuses, setAssetStatuses] = useState<LibraryItem[]>([]);
 
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -40,7 +43,6 @@ export default function TeamPage() {
           .single();
         if (profileError) {
           console.error("Error fetching profile:", profileError);
-          toast.error("Could not load your profile data.");
           setLoading(false);
           return;
         }
@@ -55,6 +57,7 @@ export default function TeamPage() {
             risksResult,
             teamResult,
             categoriesResult,
+            statusesResult,
           ] = await Promise.all([
             supabase
               .from("profiles")
@@ -78,6 +81,11 @@ export default function TeamPage() {
               .select("*, owner:profiles(first_name, last_name)")
               .eq("team_id", teamId)
               .order("name"),
+            supabase
+              .from("asset_statuses")
+              .select("*")
+              .eq("team_id", teamId)
+              .order("name"),
           ]);
 
           if (membersResult.data) setTeamMembers(membersResult.data);
@@ -91,6 +99,7 @@ export default function TeamPage() {
             }));
             setAssetCategories(transformedCategories as AssetCategory[]);
           }
+          if (statusesResult.data) setAssetStatuses(statusesResult.data);
         }
       }
       setLoading(false);
@@ -101,7 +110,7 @@ export default function TeamPage() {
   const handleInviteUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteEmail || !team?.id) {
-      toast.error("Could not determine your team. Please refresh the page.");
+      toast.error("Could not determine your team.");
       return;
     }
     setIsInviting(true);
@@ -127,11 +136,6 @@ export default function TeamPage() {
   const handleRoleChange = async (userId: string, newRole: string) => {
     if (userId === currentUserId) {
       toast.error("You cannot change your own role.");
-      // This is a small UX improvement to revert the dropdown if the user tries to change their own role.
-      const selectElement = document.querySelector(
-        `[data-user-id="${userId}"]`
-      ) as HTMLSelectElement;
-      if (selectElement) selectElement.value = currentUserRole || "user";
       return;
     }
     const { error } = await supabase
@@ -151,13 +155,11 @@ export default function TeamPage() {
   };
 
   if (loading) return <p className="p-8">Loading team data...</p>;
-
   const isAdmin = currentUserRole === "team_admin";
 
   return (
     <div className="p-8">
-      {/* UPDATED: This class now matches the other pages */}
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-4">Team & Library Management</h1>
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8" aria-label="Tabs">
@@ -259,7 +261,6 @@ export default function TeamPage() {
                             </p>
                           </div>
                           <select
-                            data-user-id={member.id}
                             value={member.role}
                             onChange={(e) =>
                               handleRoleChange(member.id, e.target.value)
@@ -281,6 +282,7 @@ export default function TeamPage() {
                   hazards={hazards}
                   risks={risks}
                   assetCategories={assetCategories}
+                  assetStatuses={assetStatuses}
                   teamMembers={teamMembers}
                   teamId={team.id}
                 />

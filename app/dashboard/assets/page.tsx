@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import AssetListPage from "@/components/AssetListPage";
-import { Asset, TeamMember } from "@/lib/types";
+import { Asset, TeamMember, AssetCategory } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -23,9 +23,9 @@ export default async function AssetsPage() {
   const teamId = profile?.team_id || null;
   const currentUserRole = profile?.role || "user";
 
-  // UPDATED: Now queries our simple and powerful view
-  const [assetsResult, categoriesResult, teamMembersResult] = await Promise.all(
-    [
+  // Fetch assets, categories, team members, and the new asset statuses all at once
+  const [assetsResult, categoriesResult, teamMembersResult, statusesResult] =
+    await Promise.all([
       supabase
         .from("assets_with_details")
         .select("*")
@@ -33,7 +33,7 @@ export default async function AssetsPage() {
         .order("created_at", { ascending: false }),
       supabase
         .from("asset_categories")
-        .select("*")
+        .select("id, name")
         .eq("team_id", teamId)
         .order("name"),
       supabase
@@ -41,14 +41,19 @@ export default async function AssetsPage() {
         .select("id, first_name, last_name, role")
         .eq("team_id", teamId)
         .order("first_name"),
-    ]
-  );
+      supabase
+        .from("asset_statuses")
+        .select("id, name")
+        .eq("team_id", teamId)
+        .order("name"),
+    ]);
 
   return (
     <AssetListPage
       initialAssets={(assetsResult.data as Asset[]) || []}
       categories={categoriesResult.data || []}
       teamMembers={(teamMembersResult.data as TeamMember[]) || []}
+      assetStatuses={statusesResult.data || []}
       teamId={teamId}
       isCurrentUserAdmin={currentUserRole === "team_admin"}
     />
