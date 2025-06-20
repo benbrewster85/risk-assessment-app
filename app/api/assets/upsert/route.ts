@@ -17,13 +17,13 @@ export async function POST(request: Request) {
         
         const supabaseAdmin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
-        const formattedRecords = records.map((record: any) => ({
+        const formattedRecords = records.map((record: Record<string, string>) => ({
             team_id: teamId,
             system_id: record['System ID'],
             manufacturer: record['Manufacturer'],
             model: record['Model'],
             serial_number: record['Serial Number'],
-            status_id: null, // Default status will be handled by the detail page
+            status_id: null,
         }));
 
         const { error } = await supabaseAdmin.from('assets').upsert(formattedRecords, { onConflict: 'system_id' });

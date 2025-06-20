@@ -47,9 +47,8 @@ export default async function AssetPage({ params }: AssetPageProps) {
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, first_name, last_name")
-      .eq("team_id", teamId)
-      .order("first_name"),
+      .select("id, first_name, last_name, role")
+      .eq("team_id", teamId),
     supabase
       .from("assets")
       .select("id, system_id, model")
