@@ -6,76 +6,26 @@ import { Resend } from 'resend';
 export async function POST(request: Request) {
     try {
         const { inviteeEmail, role, teamId } = await request.json();
+        const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+        const resend = new Resend(process.env.RESEND_API_KEY!);
 
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        const resendApiKey = process.env.RESEND_API_KEY;
-
-        if (!supabaseUrl || !serviceRoleKey || !resendApiKey) {
-            throw new Error('Missing Supabase or Resend environment variables');
-        }
-
-        const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-            auth: { autoRefreshToken: false, persistSession: false }
-        });
-
-        // --- START OF TEMPORARY CODE for TESTING ---
-        // The block below that checks if a user exists is temporarily disabled
-        // so you can send an invitation to your own email address for testing.
-        // We will re-enable this later.
-        /*
-        const { data: existing_user_id, error: rpcError } = await supabaseAdmin
-            .rpc('lookup_user_by_email', { p_email: inviteeEmail });
-
-        if (rpcError) throw rpcError;
-
-        if (existing_user_id) {
-            const { data: existingProfile, error: profileError } = await supabaseAdmin
-                .from('profiles')
-                .select('id')
-                .eq('id', existing_user_id)
-                .eq('team_id', teamId)
-                .maybeSingle();
-
-            if (profileError) throw profileError;
-
-            if (existingProfile) {
-                throw new Error('This user is already a member of your team.');
-            }
-        }
-        */
-        // --- END OF TEMPORARY CODE ---
-
-
-        const token = uuidv4();
-        const { error: inviteError } = await supabaseAdmin
-            .from('invites')
-            .insert({ email: inviteeEmail, role, token, team_id: teamId });
-
+        const { error: inviteError } = await supabaseAdmin.from('invites').insert({ email: inviteeEmail, role, token: uuidv4(), team_id: teamId });
         if (inviteError) {
-            if (inviteError.code === '23505') { 
-                throw new Error('This email address has already been invited.');
-            }
+            if (inviteError.code === '23505') { throw new Error('This email address has already been invited.'); }
             throw inviteError;
         }
 
-        const resend = new Resend(resendApiKey);
         const signupUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/login`;
-
         await resend.emails.send({
             from: 'Onboarding <onboarding@resend.dev>',
             to: [inviteeEmail],
-            subject: 'You have been invited to join the Risk Assessment Platform!',
-            html: `
-                <h1>You're Invited!</h1>
-                <p>You have been invited to join a team.</p>
-                <p>Please <a href="${signupUrl}" target="_blank">click here to sign up</a> using this email address to accept your invitation.</p>
-            `
+            subject: 'You have been invited to join Zubete!',
+            html: `<p>You have been invited to join a team on Zubete. <a href="${signupUrl}">Click here to sign up</a> and accept your invitation.</p>`
         });
 
         return NextResponse.json({ success: true, message: 'Invite email sent successfully.' });
-
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return NextResponse.json({ error: message }, { status: 400 });
     }
 }

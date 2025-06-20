@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import AssetDetailPage from "@/components/AssetDetailPage";
-import { Asset, TeamMember, AssetCategory, AssetIssue } from "@/lib/types";
+import { Asset, TeamMember, AssetIssue } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,6 @@ export default async function AssetPage({ params }: AssetPageProps) {
     .select("team_id, role")
     .eq("id", user.id)
     .single();
-
   if (!profile?.team_id) notFound();
   const teamId = profile.team_id;
   const currentUserRole = profile.role;
@@ -34,9 +33,8 @@ export default async function AssetPage({ params }: AssetPageProps) {
     .eq("id", assetId)
     .eq("team_id", teamId)
     .single();
-
-  if (assetError || !assetResult) {
-    if (assetError) console.error("Error fetching asset details:", assetError);
+  if (assetError) {
+    console.error("Error fetching asset details:", assetError);
     notFound();
   }
 
@@ -49,8 +47,9 @@ export default async function AssetPage({ params }: AssetPageProps) {
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, first_name, last_name, role")
-      .eq("team_id", teamId),
+      .select("id, first_name, last_name")
+      .eq("team_id", teamId)
+      .order("first_name"),
     supabase
       .from("assets")
       .select("id, system_id, model")
