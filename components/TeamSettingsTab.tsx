@@ -1,9 +1,9 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
-import { useRouter } from "next/navigation"; // 1. Import the router
+import { useRouter } from "next/navigation";
 import type { Team } from "@/lib/types";
 
 type TeamSettingsTabProps = {
@@ -12,7 +12,7 @@ type TeamSettingsTabProps = {
 
 export default function TeamSettingsTab({ team }: TeamSettingsTabProps) {
   const supabase = createClient();
-  const router = useRouter(); // 2. Initialize the router
+  const router = useRouter();
   const [teamName, setTeamName] = useState(team.name);
   const [logoUrl, setLogoUrl] = useState(team.logo_url);
   const [uploading, setUploading] = useState(false);
@@ -26,22 +26,16 @@ export default function TeamSettingsTab({ team }: TeamSettingsTabProps) {
       if (!event.target.files || event.target.files.length === 0) {
         throw new Error("You must select an image to upload.");
       }
-
       const file = event.target.files[0];
       const fileExt = file.name.split(".").pop();
       const filePath = `${team.id}/logo.${fileExt}`;
-
       const { error: uploadError } = await supabase.storage
         .from("team-logos")
         .upload(filePath, file, { upsert: true });
-
       if (uploadError) throw uploadError;
-
       const {
         data: { publicUrl },
       } = supabase.storage.from("team-logos").getPublicUrl(filePath);
-
-      // We need to add a timestamp to the URL to bust the cache
       const urlWithCacheBuster = `${publicUrl}?t=${new Date().getTime()}`;
       setLogoUrl(urlWithCacheBuster);
       toast.success('Logo uploaded! Click "Save Settings" to apply.');
@@ -57,17 +51,14 @@ export default function TeamSettingsTab({ team }: TeamSettingsTabProps) {
   const handleSaveChanges = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-
     const { error } = await supabase
       .from("teams")
       .update({ name: teamName, logo_url: logoUrl })
       .eq("id", team.id);
-
     if (error) {
       toast.error("Failed to save settings.");
     } else {
       toast.success("Settings saved successfully!");
-      // 3. Refresh the entire page data to update the header
       router.refresh();
     }
     setIsSubmitting(false);
@@ -90,8 +81,8 @@ export default function TeamSettingsTab({ team }: TeamSettingsTabProps) {
           type="text"
           value={teamName}
           onChange={(e) => setTeamName(e.target.value)}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
           required
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
         />
       </div>
       <div>
@@ -100,6 +91,7 @@ export default function TeamSettingsTab({ team }: TeamSettingsTabProps) {
         </label>
         <div className="mt-2 flex items-center space-x-4">
           {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={logoUrl}
               alt="Team Logo"

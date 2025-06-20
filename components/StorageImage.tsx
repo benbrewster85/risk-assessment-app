@@ -23,28 +23,25 @@ export default function StorageImage({
     const getSignedUrl = async () => {
       if (!filePath) return;
 
-      // Create a signed URL that is valid for 1 hour (3600 seconds)
       const { data, error } = await supabase.storage
         .from(bucket)
-        .createSignedUrl(filePath, 3600);
+        .createSignedUrl(filePath, 3600); // URL is valid for 1 hour
 
       if (error) {
         console.error("Error creating signed URL:", error);
-        setImageUrl(null); // Set to null on error
+        setImageUrl(null);
       } else {
         setImageUrl(data.signedUrl);
       }
     };
 
     getSignedUrl();
-    // We only want this to run when the filePath changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filePath]);
+  }, [filePath, bucket, supabase.storage]);
 
   if (!imageUrl) {
-    // Show a simple loading skeleton while the secure URL is being generated
     return <div className={`bg-gray-200 animate-pulse ${className}`}></div>;
   }
 
+  // eslint-disable-next-line @next/next/no-img-element
   return <img src={imageUrl} className={className} alt={alt} />;
 }

@@ -20,7 +20,7 @@ export default function ProjectListPage({
   teamId,
 }: ProjectListPageProps) {
   const supabase = createClient();
-  const [projects, setProjects] = useState(initialProjects);
+  const [projects] = useState(initialProjects);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<ProjectListItem | null>(
     null
