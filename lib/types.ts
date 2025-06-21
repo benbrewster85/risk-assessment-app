@@ -95,7 +95,6 @@ export type AssetCategory = {
     } | null;
 };
 
-// UPDATED: This type now correctly matches our database view
 export type Asset = {
     id: string;
     system_id: string;
@@ -103,22 +102,20 @@ export type Asset = {
     manufacturer: string | null;
     model: string | null;
     serial_number: string | null;
-    status: string | null; // This is now the status NAME from the joined table
+    status: string | null;
+    status_id: string | null;
     created_at: string;
     category_id: string | null;
     current_assignee_id: string | null;
     parent_asset_id: string | null;
     last_calibrated_date: string | null;
     calibration_cycle_months: number | null;
-    status_id: string | null; // The foreign key ID
     category_name: string | null;
     assignee_first_name: string | null;
     assignee_last_name: string | null;
     parent_assignee_first_name: string | null;
     parent_assignee_last_name: string | null;
 };
-
-// Add these new types to your file
 
 export type AssetIssue = {
     id: string;
@@ -129,16 +126,26 @@ export type AssetIssue = {
     status: string;
     resolution_notes: string | null;
     resolved_at: string | null;
-    reporter: {
+    reporter: { first_name: string | null; last_name: string | null; } | null;
+    resolver: { first_name: string | null; last_name: string | null; } | null;
+    photos: { id: string; file_path: string; }[];
+};
+
+// These are the types that were missing from the Vercel build log
+export type ReportSignatory = {
+    profiles: {
         first_name: string | null;
         last_name: string | null;
-    } | null;
-    resolver: {
-        first_name: string | null;
-        last_name: string | null;
-    } | null;
-    photos: {
+        role: string;
         id: string;
-        file_path: string;
-    }[];
+    } | null;
+};
+
+export type ReportSignature = {
+    signed_at: string;
+    profiles: {
+        first_name: string | null;
+        last_name: string | null;
+        id: string;
+    } | null;
 };
