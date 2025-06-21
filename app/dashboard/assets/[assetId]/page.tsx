@@ -23,25 +23,21 @@ export default async function AssetPage({ params }: AssetPageProps) {
     .select("team_id, role")
     .eq("id", user.id)
     .single();
-
   if (!profile?.team_id) notFound();
   const teamId = profile.team_id;
   const currentUserRole = profile.role;
 
-  // This query now fetches from the view, which is correct
   const { data: assetResult, error: assetError } = await supabase
     .from("assets_with_details")
     .select("*")
     .eq("id", assetId)
     .eq("team_id", teamId)
     .single();
-
-  if (assetError || !assetResult) {
-    if (assetError) console.error("Error fetching asset details:", assetError);
+  if (assetError) {
+    console.error("Error fetching asset details:", assetError);
     notFound();
   }
 
-  // UPDATED: The fetch for 'historyResult' has been removed
   const [
     teamMembersResult,
     childAssetsResult,
@@ -51,8 +47,9 @@ export default async function AssetPage({ params }: AssetPageProps) {
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, first_name, last_name, role")
-      .eq("team_id", teamId),
+      .select("id, first_name, last_name")
+      .eq("team_id", teamId)
+      .order("first_name"),
     supabase
       .from("assets")
       .select("id, system_id, model")
@@ -89,6 +86,7 @@ export default async function AssetPage({ params }: AssetPageProps) {
   }));
 
   return (
+    // The AssetDetailPage now handles all its own UI rendering
     <AssetDetailPage
       initialAsset={assetResult as Asset}
       teamMembers={(teamMembersResult.data as TeamMember[]) || []}
@@ -96,7 +94,6 @@ export default async function AssetPage({ params }: AssetPageProps) {
       availableAssets={availableAssetsResult.data || []}
       assetStatuses={statusesResult.data || []}
       initialIssues={initialIssues as AssetIssue[]}
-      // The 'initialHistory' prop has been removed
       isCurrentUserAdmin={currentUserRole === "team_admin"}
       currentUserId={user.id}
     />

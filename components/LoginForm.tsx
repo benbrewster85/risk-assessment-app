@@ -2,20 +2,17 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 export default function LoginForm() {
   const supabase = createClient();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
-  const initialView =
-    searchParams.get("view") === "sign_up" ? "sign_up" : "enter_email";
   const [view, setView] = useState<
-    "sign_in" | "sign_up" | "enter_email" | "forgot_password"
-  >(initialView);
+    "enter_email" | "sign_in" | "sign_up" | "forgot_password"
+  >("enter_email");
   const [isLoading, setIsLoading] = useState(false);
 
   const [firstName, setFirstName] = useState("");
@@ -49,12 +46,15 @@ export default function LoginForm() {
     if (!response.ok) {
       toast.error(result.error || "An unknown error occurred.");
     } else {
-      if (result.status === "USER_EXISTS") setView("sign_in");
-      else if (result.status === "INVITE_PENDING") setView("sign_up");
-      else
+      if (result.status === "USER_EXISTS") {
+        setView("sign_in");
+      } else if (result.status === "INVITE_PENDING") {
+        setView("sign_up");
+      } else {
         toast.error(
           "No account or invitation found for this email. Please contact your administrator."
         );
+      }
     }
     setIsLoading(false);
   };
@@ -66,7 +66,10 @@ export default function LoginForm() {
       email,
       password,
     });
-    if (error) toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+    }
+    // The onAuthStateChange effect will handle the redirect on success
     setIsLoading(false);
   };
 
@@ -86,7 +89,7 @@ export default function LoginForm() {
       );
     } else {
       toast.success(
-        "Success! Please check your email for a confirmation link."
+        "Success! Please check your email for a confirmation link to complete your sign-up."
       );
       setView("enter_email");
       setEmail("");
@@ -231,8 +234,10 @@ export default function LoginForm() {
                 id="email-reset"
                 type="email"
                 value={email}
-                disabled
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-100"
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                autoFocus
               />
             </div>
             <button
@@ -244,7 +249,7 @@ export default function LoginForm() {
             </button>
             <button
               type="button"
-              onClick={() => setView("sign_in")}
+              onClick={() => setView("enter_email")}
               className="mt-2 w-full text-sm text-center text-gray-600 hover:underline"
             >
               Back to Sign In

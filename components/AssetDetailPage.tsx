@@ -13,6 +13,7 @@ import {
   XCircle,
   FileText,
   Tool,
+  Printer,
 } from "react-feather";
 import { useRouter } from "next/navigation";
 import StatusBadge from "./StatusBadge";
@@ -20,6 +21,7 @@ import LogAssetIssueModal from "./LogAssetIssueModal";
 import LogMaintenanceModal from "./LogMaintenanceModal";
 import ResolveIssueModal from "./ResolveIssueModal";
 import StorageImage from "./StorageImage";
+import AssetQrCode from "./AssetQrCode"; // Import the QR code component
 
 type ChildAsset = { id: string; system_id: string; model: string | null };
 type Status = { id: string; name: string };
@@ -204,7 +206,7 @@ export default function AssetDetailPage({
         issue={resolvingIssue}
       />
 
-      <div className="p-8">
+      <div className="p-4 md:p-8">
         <div className="max-w-7xl mx-auto space-y-8">
           <div className="text-sm">
             <Link
@@ -245,9 +247,9 @@ export default function AssetDetailPage({
             </div>
           )}
 
-          <div className="bg-white rounded-lg shadow p-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="md:col-span-2 space-y-4">
+          <div className="bg-white rounded-lg shadow p-6 md:p-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 space-y-4">
                 <div>
                   <h1 className="text-3xl font-bold">
                     {asset.manufacturer} {asset.model}
@@ -306,12 +308,25 @@ export default function AssetDetailPage({
                   </p>
                 </div>
               </div>
-              <div className="md:col-span-1 space-y-4">
+              <div className="lg:col-span-1 space-y-4">
                 <div className="p-4 bg-slate-50 rounded-lg">
                   <p className="text-sm font-medium">Currently Assigned To</p>
                   <p className="text-xl font-bold mt-1">
                     {currentAssigneeName || "In Stores"}
                   </p>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-lg">
+                  <h3 className="text-sm font-medium mb-2">QR Code Label</h3>
+                  <div className="bg-white p-4 flex justify-center rounded-md">
+                    <AssetQrCode assetId={asset.id} />
+                  </div>
+                  <button
+                    onClick={() => window.print()}
+                    className="w-full mt-2 text-sm py-2 px-4 border rounded-md hover:bg-gray-100 flex items-center justify-center"
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print Label
+                  </button>
                 </div>
                 <div className="p-4 bg-slate-50 rounded-lg">
                   <p className="text-sm font-medium">Calibration Status</p>
