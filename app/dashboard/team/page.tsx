@@ -13,17 +13,14 @@ export default function TeamPage() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("members");
-
   const [team, setTeam] = useState<Team | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [hazards, setHazards] = useState<LibraryItem[]>([]);
   const [risks, setRisks] = useState<LibraryItem[]>([]);
   const [assetCategories, setAssetCategories] = useState<AssetCategory[]>([]);
   const [assetStatuses, setAssetStatuses] = useState<LibraryItem[]>([]);
-
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("user");
   const [isInviting, setIsInviting] = useState(false);
@@ -36,21 +33,14 @@ export default function TeamPage() {
       } = await supabase.auth.getUser();
       if (user) {
         setCurrentUserId(user.id);
-        const { data: profileData, error: profileError } = await supabase
+        const { data: profileData } = await supabase
           .from("profiles")
           .select("role, team_id")
           .eq("id", user.id)
           .single();
-        if (profileError) {
-          console.error("Error fetching profile:", profileError);
-          setLoading(false);
-          return;
-        }
-
         if (profileData && profileData.team_id) {
           setCurrentUserRole(profileData.role);
           const teamId = profileData.team_id;
-
           const [
             membersResult,
             hazardsResult,
@@ -87,7 +77,6 @@ export default function TeamPage() {
               .eq("team_id", teamId)
               .order("name"),
           ]);
-
           if (membersResult.data) setTeamMembers(membersResult.data);
           if (hazardsResult.data) setHazards(hazardsResult.data);
           if (risksResult.data) setRisks(risksResult.data);
@@ -159,7 +148,7 @@ export default function TeamPage() {
 
   return (
     <div className="p-8">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold mb-4">Team & Library Management</h1>
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8" aria-label="Tabs">
@@ -191,8 +180,9 @@ export default function TeamPage() {
           ) : (
             <>
               {activeTab === "members" && (
-                <>
-                  <div className="bg-white p-6 rounded-lg shadow mb-8">
+                // UPDATED: Wrapped the two sections in a single div
+                <div className="space-y-8">
+                  <div className="bg-white p-6 rounded-lg shadow">
                     <h2 className="text-2xl font-bold mb-4">
                       Invite New Member
                     </h2>
@@ -275,7 +265,7 @@ export default function TeamPage() {
                       ))}
                     </ul>
                   </div>
-                </>
+                </div>
               )}
               {activeTab === "library" && team && (
                 <LibraryPage
