@@ -119,6 +119,7 @@ export type Asset = {
 
 export type AssetIssue = {
     id: string;
+    asset_id: string; // The missing foreign key ID
     created_at: string;
     log_notes: string;
     log_type: string;
@@ -126,9 +127,22 @@ export type AssetIssue = {
     status: string;
     resolution_notes: string | null;
     resolved_at: string | null;
-    reporter: { first_name: string | null; last_name: string | null; } | null;
-    resolver: { first_name: string | null; last_name: string | null; } | null;
-    photos: { id: string; file_path: string; }[];
+    reporter: {
+        first_name: string | null;
+        last_name: string | null;
+    } | null;
+    resolver: {
+        first_name: string | null;
+        last_name: string | null;
+    } | null;
+    photos: {
+        id: string;
+        file_path: string;
+    }[];
+    // The optional nested asset from the join
+    asset?: {
+        system_id: string;
+    } | null;
 };
 
 // These are the types that were missing from the Vercel build log
@@ -149,3 +163,5 @@ export type ReportSignature = {
         id: string;
     } | null;
 };
+
+

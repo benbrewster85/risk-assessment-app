@@ -23,21 +23,25 @@ export default async function AssetPage({ params }: AssetPageProps) {
     .select("team_id, role")
     .eq("id", user.id)
     .single();
+
   if (!profile?.team_id) notFound();
   const teamId = profile.team_id;
   const currentUserRole = profile.role;
 
+  // This query now fetches from the view, which is correct
   const { data: assetResult, error: assetError } = await supabase
     .from("assets_with_details")
     .select("*")
     .eq("id", assetId)
     .eq("team_id", teamId)
     .single();
-  if (assetError) {
-    console.error("Error fetching asset details:", assetError);
+
+  if (assetError || !assetResult) {
+    if (assetError) console.error("Error fetching asset details:", assetError);
     notFound();
   }
 
+  // UPDATED: The fetch for 'historyResult' has been removed
   const [
     teamMembersResult,
     childAssetsResult,
@@ -92,6 +96,7 @@ export default async function AssetPage({ params }: AssetPageProps) {
       availableAssets={availableAssetsResult.data || []}
       assetStatuses={statusesResult.data || []}
       initialIssues={initialIssues as AssetIssue[]}
+      // The 'initialHistory' prop has been removed
       isCurrentUserAdmin={currentUserRole === "team_admin"}
       currentUserId={user.id}
     />

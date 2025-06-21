@@ -50,7 +50,7 @@ export default function AssetDetailPage({
   const [asset, setAsset] = useState(initialAsset);
   const [issues, setIssues] = useState(initialIssues);
   const [selectedAssignee, setSelectedAssignee] = useState(
-    asset.current_assignee_id || ""
+    initialAsset.current_assignee_id || ""
   );
   const [isAssigning, setIsAssigning] = useState(false);
   const [selectedChildId, setSelectedChildId] = useState("");
@@ -76,7 +76,7 @@ export default function AssetDetailPage({
     if (error) {
       toast.error(`Failed to assign asset: ${error.message}`);
     } else {
-      toast.success("Asset successfully assigned!");
+      toast.success("Asset assigned successfully!");
       router.refresh();
     }
     setIsAssigning(false);
@@ -133,8 +133,6 @@ export default function AssetDetailPage({
   };
 
   const handleLogSuccess = (newLog: AssetIssue) => {
-    // We just refresh the page to get all new data, including the new log
-    // This is simpler and avoids the loop.
     router.refresh();
   };
 
@@ -148,9 +146,6 @@ export default function AssetDetailPage({
 
   const currentAssigneeName =
     `${asset.assignee_first_name || ""} ${asset.assignee_last_name || ""}`.trim();
-  const unassignedAssetStatuses = assetStatuses.filter(
-    (s) => s.name !== "On Site" && s.name !== "In Use"
-  );
 
   let nextDueDate: Date | null = null;
   let statusText = "N/A";
@@ -210,8 +205,8 @@ export default function AssetDetailPage({
       />
 
       <div className="p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-6 text-sm">
+        <div className="max-w-7xl mx-auto space-y-8">
+          <div className="text-sm">
             <Link
               href="/dashboard/assets"
               className="text-blue-600 hover:underline"
@@ -223,7 +218,7 @@ export default function AssetDetailPage({
           </div>
 
           {asset.parent_asset_id && (
-            <div className="mb-6 p-4 bg-blue-50 rounded-lg flex justify-between items-center">
+            <div className="p-4 bg-blue-50 rounded-lg flex justify-between items-center">
               <div className="flex items-center">
                 <Link2 className="h-5 w-5 mr-3 text-blue-600" />
                 <div>
@@ -278,12 +273,15 @@ export default function AssetDetailPage({
                     <span className="font-semibold w-32 inline-block">
                       Current Status:
                     </span>
-                    {isCurrentUserAdmin && !asset.current_assignee_id ? (
+                    {isCurrentUserAdmin ? (
                       <select
                         value={asset.status_id || ""}
                         onChange={(e) => handleStatusChange(e.target.value)}
                         className="block w-full max-w-xs rounded-md border-gray-300 shadow-sm"
                       >
+                        <option value="" disabled>
+                          Select a status
+                        </option>
                         {assetStatuses.map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.name}
@@ -377,7 +375,7 @@ export default function AssetDetailPage({
             </div>
           </div>
 
-          <div className="mt-8 bg-white rounded-lg shadow p-8">
+          <div className="bg-white rounded-lg shadow p-8">
             <h2 className="text-2xl font-bold mb-4">
               Associated Kit / Accessories
             </h2>
@@ -442,7 +440,7 @@ export default function AssetDetailPage({
             )}
           </div>
 
-          <div className="mt-8 bg-white rounded-lg shadow p-8">
+          <div className="bg-white rounded-lg shadow p-8">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold">Issue & Maintenance Log</h2>
               <div className="flex space-x-2">
@@ -495,6 +493,7 @@ export default function AssetDetailPage({
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {issue.photos.map((p) => {
+                          if (!p.file_path) return null;
                           const isPdf = p.file_path
                             .toLowerCase()
                             .endsWith(".pdf");
