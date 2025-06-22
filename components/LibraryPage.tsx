@@ -38,31 +38,33 @@ export default function LibraryPage({
 
   return (
     <div>
-      <div className="flex space-x-2 border-b border-gray-200">
-        <button
-          onClick={() => setActiveAssetType("hazards")}
-          className={buttonClass("hazards")}
-        >
-          Hazards
-        </button>
-        <button
-          onClick={() => setActiveAssetType("risks")}
-          className={buttonClass("risks")}
-        >
-          Risks
-        </button>
-        <button
-          onClick={() => setActiveAssetType("categories")}
-          className={buttonClass("categories")}
-        >
-          Asset Categories
-        </button>
-        <button
-          onClick={() => setActiveAssetType("statuses")}
-          className={buttonClass("statuses")}
-        >
-          Asset Statuses
-        </button>
+      <div className="overflow-x-auto">
+        <div className="flex space-x-2 border-b border-gray-200">
+          <button
+            onClick={() => setActiveAssetType("hazards")}
+            className={buttonClass("hazards")}
+          >
+            Hazards
+          </button>
+          <button
+            onClick={() => setActiveAssetType("risks")}
+            className={buttonClass("risks")}
+          >
+            Risks
+          </button>
+          <button
+            onClick={() => setActiveAssetType("categories")}
+            className={buttonClass("categories")}
+          >
+            Asset Categories
+          </button>
+          <button
+            onClick={() => setActiveAssetType("statuses")}
+            className={buttonClass("statuses")}
+          >
+            Asset Statuses
+          </button>
+        </div>
       </div>
       <div className="-mt-px">
         {activeAssetType === "hazards" && (

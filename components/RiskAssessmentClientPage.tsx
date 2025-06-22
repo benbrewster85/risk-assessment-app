@@ -15,6 +15,7 @@ import {
 } from "@/lib/types";
 import { convertToCsv } from "@/lib/export";
 import { toast } from "react-hot-toast";
+import { Plus, Download, Eye, Trash2 } from "react-feather";
 
 const getRiskColor = (score: number) => {
   if (score >= 15) return "bg-red-200";
@@ -204,32 +205,27 @@ export default function RiskAssessmentClientPage({
               </p>
             </div>
             <div className="flex space-x-2 flex-shrink-0">
-              {isCurrentUserAdmin && (
-                <button
-                  onClick={handleSaveAsTemplate}
-                  className="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700"
-                >
-                  Save as Template
-                </button>
-              )}
-              <Link
-                href={`/dashboard/ra/${ra.id}/report`}
-                className="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700"
-              >
-                View Report
-              </Link>
               <button
                 onClick={handleExport}
-                className="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700"
+                className="bg-gray-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-gray-700 flex items-center transition-colors"
               >
-                Export to CSV
+                <Download className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Export</span>
               </button>
+              <Link
+                href={`/dashboard/ra/${ra.id}/report`}
+                className="bg-cyan-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-cyan-700 flex items-center transition-colors"
+              >
+                <Eye className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Report</span>
+              </Link>
               {isCurrentUserAdmin && (
                 <button
                   onClick={handleAddNewClick}
-                  className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700"
+                  className="bg-blue-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-blue-700 flex items-center transition-colors"
                 >
-                  + Add New Entry
+                  <Plus className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">New Entry</span>
                 </button>
               )}
             </div>
