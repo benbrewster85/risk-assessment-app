@@ -13,8 +13,10 @@ export default function AssetQrCode({ assetId }: AssetQrCodeProps) {
   return (
     <div>
       {/* UPDATED: We are now using the specific <QRCodeCanvas /> component */}
-      <QRCodeCanvas value={url} size={256} level={"H"} includeMargin={true} />
-      <p className="text-xs text-center mt-2 text-gray-500 break-all">{url}</p>
+      <QRCodeCanvas value={url} size={128} level={"H"} includeMargin={true} />
+      {/* <p className="text-xs text-left mt-2 text-gray-500 break-all">
+        {url}
+      </p>{" "} */}
     </div>
   );
 }

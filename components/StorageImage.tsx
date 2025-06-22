@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { FileText } from "react-feather";
 
 type StorageImageProps = {
   filePath: string;
@@ -17,7 +18,7 @@ export default function StorageImage({
   alt,
 }: StorageImageProps) {
   const supabase = createClient();
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const getSignedUrl = async () => {
@@ -29,19 +30,45 @@ export default function StorageImage({
 
       if (error) {
         console.error("Error creating signed URL:", error);
-        setImageUrl(null);
+        setSignedUrl(null);
       } else {
-        setImageUrl(data.signedUrl);
+        setSignedUrl(data.signedUrl);
       }
     };
 
     getSignedUrl();
   }, [filePath, bucket, supabase.storage]);
 
-  if (!imageUrl) {
+  const isPdf = filePath.toLowerCase().endsWith(".pdf");
+
+  // Show a placeholder while the secure URL is being generated
+  if (!signedUrl) {
     return <div className={`bg-gray-200 animate-pulse ${className}`}></div>;
   }
 
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={imageUrl} className={className} alt={alt} />;
+  // This function will be called when the user clicks the image/icon
+  const openInNewTab = () => {
+    window.open(signedUrl, "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={openInNewTab}
+      className={`block border rounded-md p-2 hover:bg-gray-50 ${className}`}
+    >
+      {isPdf ? (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-red-50 text-red-700">
+          <FileText />
+          <span className="text-xs mt-1">PDF</span>
+        </div>
+      ) : (
+        <img
+          src={signedUrl}
+          alt={alt}
+          className="w-full h-full object-cover rounded-sm"
+        />
+      )}
+    </button>
+  );
 }

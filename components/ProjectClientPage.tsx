@@ -11,6 +11,7 @@ import DynamicRiskLog from "./DynamicRiskLog";
 import ProjectDetailsTab from "./ProjectDetailsTab";
 import MethodStatementTab from "./MethodStatementTab";
 import { toast } from "react-hot-toast";
+import { Plus, AlertTriangle, Trash2 } from "react-feather";
 
 type ProjectClientPageProps = {
   initialProject: Project;
@@ -409,23 +410,26 @@ export default function ProjectClientPage({
               <h1 className="text-3xl font-bold">{project.name}</h1>
               <p className="text-gray-600">Ref: {project.reference || "N/A"}</p>
             </div>
-            <div className="flex space-x-2 flex-shrink-0">
-              <button
-                onClick={() => openLogDynamicRiskModal(null)}
-                className="bg-orange-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-700"
-              >
-                Log Dynamic Risk
-              </button>
-              {isAdmin && (
-                <button
-                  onClick={openCreateRaModal}
-                  className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700"
-                >
-                  + New Risk Assessment
-                </button>
-              )}
-            </div>
           </div>
+          <div className="flex space-x-2 flex-shrink-0">
+            <button
+              onClick={() => openLogDynamicRiskModal(null)}
+              className="bg-orange-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-orange-700 flex items-center"
+            >
+              <AlertTriangle className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Log Dynamic Risk</span>
+            </button>
+            {isAdmin && (
+              <button
+                onClick={openCreateRaModal}
+                className="bg-green-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-green-700 flex items-center"
+              >
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">New RA</span>
+              </button>
+            )}
+          </div>
+
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8" aria-label="Tabs">
               <button

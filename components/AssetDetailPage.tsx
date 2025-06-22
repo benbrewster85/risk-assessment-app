@@ -20,8 +20,8 @@ import StatusBadge from "./StatusBadge";
 import LogAssetIssueModal from "./LogAssetIssueModal";
 import LogMaintenanceModal from "./LogMaintenanceModal";
 import ResolveIssueModal from "./ResolveIssueModal";
-import StorageImage from "./StorageImage";
 import AssetQrCode from "./AssetQrCode"; // Import the QR code component
+import StorageImage from "./StorageImage";
 
 type ChildAsset = { id: string; system_id: string; model: string | null };
 type Status = { id: string; name: string };
@@ -61,6 +61,7 @@ export default function AssetDetailPage({
   const [isLogMaintenanceModalOpen, setIsLogMaintenanceModalOpen] =
     useState(false);
   const [resolvingIssue, setResolvingIssue] = useState<AssetIssue | null>(null);
+  const [signedUrls, setSignedUrls] = useState<Map<string, string>>(new Map());
 
   // This effect ensures the component's state stays in sync with new data after a refresh
   useEffect(() => {
@@ -306,6 +307,19 @@ export default function AssetDetailPage({
                       year: "numeric",
                     })}
                   </p>
+                  <div className="p-4 bg-slate-50 rounded-lg max-w-xs">
+                    <h3 className="text-sm font-medium mb-2">QR Code Label</h3>
+                    <div className="bg-white p-4 flex justify-start rounded-md">
+                      <AssetQrCode assetId={asset.id} />
+                    </div>
+                    <button
+                      onClick={() => window.print()}
+                      className="w-full mt-2 text-sm py-2 px-4 border rounded-md hover:bg-gray-100 flex items-center justify-start"
+                    >
+                      <Printer className="h-4 w-4 mr-2" />
+                      Print Label
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="lg:col-span-1 space-y-4">
@@ -314,19 +328,6 @@ export default function AssetDetailPage({
                   <p className="text-xl font-bold mt-1">
                     {currentAssigneeName || "In Stores"}
                   </p>
-                </div>
-                <div className="p-4 bg-slate-50 rounded-lg">
-                  <h3 className="text-sm font-medium mb-2">QR Code Label</h3>
-                  <div className="bg-white p-4 flex justify-center rounded-md">
-                    <AssetQrCode assetId={asset.id} />
-                  </div>
-                  <button
-                    onClick={() => window.print()}
-                    className="w-full mt-2 text-sm py-2 px-4 border rounded-md hover:bg-gray-100 flex items-center justify-center"
-                  >
-                    <Printer className="h-4 w-4 mr-2" />
-                    Print Label
-                  </button>
                 </div>
                 <div className="p-4 bg-slate-50 rounded-lg">
                   <p className="text-sm font-medium">Calibration Status</p>
@@ -458,18 +459,21 @@ export default function AssetDetailPage({
           <div className="bg-white rounded-lg shadow p-8">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold">Issue & Maintenance Log</h2>
+
               <div className="flex space-x-2">
                 <button
                   onClick={() => setIsLogMaintenanceModalOpen(true)}
-                  className="bg-blue-600 text-white font-bold py-2 px-3 text-sm rounded-lg hover:bg-blue-700"
+                  className="bg-blue-600 text-white font-bold py-2 px-3 text-sm rounded-lg hover:bg-blue-700 flex items-center"
                 >
-                  + Log Maintenance
+                  <Tool className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Log Maintenance</span>
                 </button>
                 <button
                   onClick={() => setIsLogIssueModalOpen(true)}
-                  className="bg-orange-600 text-white font-bold py-2 px-3 text-sm rounded-lg hover:bg-orange-700"
+                  className="bg-orange-600 text-white font-bold py-2 px-3 text-sm rounded-lg hover:bg-orange-700 flex items-center"
                 >
-                  + Log Issue
+                  <AlertTriangle className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Log Issue</span>
                 </button>
               </div>
             </div>
@@ -508,24 +512,17 @@ export default function AssetDetailPage({
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {issue.photos.map((p) => {
+                          // We removed the surrounding <a> tag.
+                          // The StorageImage component now handles the click itself.
                           if (!p.file_path) return null;
-                          const isPdf = p.file_path
-                            .toLowerCase()
-                            .endsWith(".pdf");
                           return (
-                            <a
+                            <StorageImage
                               key={p.id}
-                              href={p.file_path}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <StorageImage
-                                filePath={p.file_path}
-                                bucket="asset-issue-photos"
-                                alt="Issue attachment"
-                                className="h-24 w-24 object-cover rounded-md border hover:opacity-80"
-                              />
-                            </a>
+                              filePath={p.file_path}
+                              bucket="asset-issue-photos"
+                              alt="Issue attachment"
+                              className="h-24 w-24"
+                            />
                           );
                         })}
                       </div>

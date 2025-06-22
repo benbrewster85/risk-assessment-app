@@ -4,15 +4,26 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Team } from "@/lib/types";
-import { LogOut, User as UserIcon, Shield, ChevronDown } from "react-feather";
+import {
+  LogOut,
+  User as UserIcon,
+  Shield,
+  ChevronDown,
+  Menu,
+} from "react-feather";
 import { useState, useEffect, useRef } from "react";
 
 type HeaderProps = {
   team: Team | null;
   isSuperAdmin: boolean;
+  onMenuClick: () => void;
 };
 
-export default function Header({ team, isSuperAdmin }: HeaderProps) {
+export default function Header({
+  team,
+  isSuperAdmin,
+  onMenuClick,
+}: HeaderProps) {
   const supabase = createClient();
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -40,19 +51,29 @@ export default function Header({ team, isSuperAdmin }: HeaderProps) {
     <header className="bg-white border-b border-gray-200 flex-shrink-0 print:hidden">
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center space-x-3">
-            {team?.logo_url ? (
-              <img
-                src={team.logo_url}
-                alt="Team Logo"
-                className="h-9 w-9 rounded-md object-cover"
-              />
-            ) : (
-              <div className="h-9 w-9 rounded-md bg-slate-200"></div>
-            )}
-            <span className="text-lg font-semibold text-gray-800">
-              {team?.name || "My Dashboard"}
-            </span>
+          <div className="flex items-center">
+            <button
+              onClick={onMenuClick}
+              className="lg:hidden mr-4 text-gray-500 hover:text-gray-700"
+            >
+              <Menu size={24} />
+            </button>
+            <div className="flex items-center space-x-3">
+              {team?.logo_url ? (
+                <img
+                  src={team.logo_url}
+                  alt="Team Logo"
+                  className="h-9 w-9 rounded-md object-cover"
+                />
+              ) : (
+                <div className="h-9 w-9 rounded-md bg-slate-200 flex items-center justify-center text-slate-400 font-bold text-lg">
+                  Z
+                </div>
+              )}
+              <span className="text-lg font-semibold text-gray-800">
+                {team?.name || "Zubete"}
+              </span>
+            </div>
           </div>
           <div className="relative" ref={menuRef}>
             <button

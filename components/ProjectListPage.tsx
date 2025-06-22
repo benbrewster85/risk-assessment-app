@@ -7,6 +7,7 @@ import Modal from "@/components/Modal";
 import ConfirmModal from "./ConfirmModal";
 import { ProjectListItem } from "@/lib/types";
 import { toast } from "react-hot-toast";
+import { Plus, Edit, Trash2 } from "react-feather";
 
 type ProjectListPageProps = {
   initialProjects: ProjectListItem[];
@@ -223,9 +224,10 @@ export default function ProjectListPage({
             {currentUserRole === "team_admin" && (
               <button
                 onClick={openCreateModal}
-                className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                className="bg-blue-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-blue-700 flex items-center transition-colors"
               >
-                + New Project
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">New Project</span>
               </button>
             )}
           </div>

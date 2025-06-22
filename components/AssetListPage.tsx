@@ -10,7 +10,13 @@ import ConfirmModal from "./ConfirmModal";
 import Modal from "./Modal";
 import { Asset, TeamMember } from "@/lib/types";
 import StatusBadge from "./StatusBadge";
-import { AlertTriangle, CheckCircle, Download } from "react-feather";
+import {
+  AlertTriangle,
+  CheckCircle,
+  Download,
+  Upload,
+  Plus,
+} from "react-feather";
 import Papa from "papaparse";
 
 type Category = { id: string; name: string };
@@ -80,12 +86,10 @@ export default function AssetListPage({
   const handleSuccess = (resultAsset: Asset) => {
     router.refresh();
   };
-
   const openCreateModal = () => {
     setEditingAsset(null);
     setIsModalOpen(true);
   };
-
   const openEditModal = (asset: Asset) => {
     setEditingAsset(asset);
     setIsModalOpen(true);
@@ -165,7 +169,6 @@ export default function AssetListPage({
       const calibrationMatch =
         !calibrationFilter ||
         getCalibrationStatus(asset).text === calibrationFilter;
-
       return categoryMatch && statusMatch && assigneeMatch && calibrationMatch;
     });
   }, [assets, categoryFilter, statusFilter, assigneeFilter, calibrationFilter]);
@@ -235,7 +238,7 @@ export default function AssetListPage({
         onClose={() => setDeletingAsset(null)}
         onConfirm={handleDelete}
         title="Delete Asset"
-        message={`Are you sure you want to delete the asset '${deletingAsset?.system_id} - ${deletingAsset?.model}"?`}
+        message={`Are you sure you want to delete the asset '${deletingAsset?.system_id} - ${deletingAsset?.model}'? This action cannot be undone.`}
         confirmText="Delete"
         isDestructive={true}
       />
@@ -273,7 +276,7 @@ export default function AssetListPage({
           <div className="mt-6 flex justify-end">
             <button
               type="button"
-              onClick={() => setIsModalOpen(false)}
+              onClick={() => setIsBulkAssignModalOpen(false)}
               className="mr-2 py-2 px-4 border rounded-md"
             >
               Cancel
@@ -296,10 +299,10 @@ export default function AssetListPage({
                 <a
                   href="/api/assets/export"
                   download
-                  className="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700 flex items-center"
+                  className="bg-gray-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-gray-700 flex items-center"
                 >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Inventory
+                  <Download className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Download</span>
                 </a>
                 <input
                   type="file"
@@ -311,15 +314,23 @@ export default function AssetListPage({
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
-                  className="bg-teal-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-teal-700 disabled:bg-gray-400"
+                  className="bg-teal-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-teal-700 disabled:bg-gray-400 flex items-center"
                 >
-                  {isUploading ? "Processing..." : "Import from CSV"}
+                  {isUploading ? (
+                    "..."
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Import</span>
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={openCreateModal}
-                  className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700"
+                  className="bg-blue-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-blue-700 flex items-center"
                 >
-                  + Add New Asset
+                  <Plus className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">New Asset</span>
                 </button>
               </div>
             )}
@@ -347,7 +358,7 @@ export default function AssetListPage({
               <div>
                 <label
                   htmlFor="categoryFilter"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-medium"
                 >
                   Category
                 </label>
@@ -368,7 +379,7 @@ export default function AssetListPage({
               <div>
                 <label
                   htmlFor="statusFilter"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-medium"
                 >
                   Status
                 </label>
@@ -389,7 +400,7 @@ export default function AssetListPage({
               <div>
                 <label
                   htmlFor="assigneeFilter"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-medium"
                 >
                   Assigned To
                 </label>
@@ -412,7 +423,7 @@ export default function AssetListPage({
               <div>
                 <label
                   htmlFor="calibFilter"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-medium"
                 >
                   Calibration
                 </label>
