@@ -164,4 +164,38 @@ export type ReportSignature = {
     } | null;
 };
 
+export type Vehicle = {
+    id: string;
+    team_id: string;
+    registration_number: string;
+    manufacturer: string | null;
+    model: string | null;
+    current_assignee_id: string | null;
+    last_serviced_date: string | null;
+    service_cycle_months: number;
+    mot_due_date: string | null;
+    created_at: string;
+};
 
+export type VehicleEvent = {
+    id: string;
+    created_at: string;
+    log_notes: string | null;
+    log_type: string;
+    event_date: string | null; // This was the missing property
+    status: string;
+    resolution_notes: string | null;
+    resolved_at: string | null;
+    reporter: {
+        first_name: string | null;
+        last_name: string | null;
+    } | null;
+    resolver: {
+        first_name: string | null;
+        last_name: string | null;
+    } | null;
+    attachments: {
+        id: string;
+        file_path: string;
+    }[];
+};

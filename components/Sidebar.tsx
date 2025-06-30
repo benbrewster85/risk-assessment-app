@@ -8,7 +8,7 @@ const navLinks = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
   { name: "Projects", href: "/dashboard/projects", icon: Folder },
   { name: "Asset Management", href: "/dashboard/assets", icon: HardDrive },
-  { name: "Vehicle Management", href: "#", icon: Truck, comingSoon: true },
+  { name: "Vehicle Management", href: "/dashboard/vehicles", icon: Truck },
   { name: "Team Management", href: "/dashboard/team", icon: Users },
 ];
 
@@ -33,26 +33,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           <Link
             key={link.name}
             href={link.href}
-            onClick={(e) => {
-              if (link.comingSoon) {
-                e.preventDefault();
-              } else {
-                onClose(); // Close sidebar on mobile navigation
-              }
-            }}
             className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg group ${
               isActive
                 ? "bg-blue-100 text-blue-700"
                 : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-            } ${link.comingSoon ? "cursor-not-allowed opacity-50" : ""}`}
+            } `}
           >
             <link.icon className="mr-3 h-5 w-5 flex-shrink-0" />
             {link.name}
-            {link.comingSoon && (
-              <span className="ml-auto text-xs font-semibold bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
-                Soon
-              </span>
-            )}
           </Link>
         );
       })}
