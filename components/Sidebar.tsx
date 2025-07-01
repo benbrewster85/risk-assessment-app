@@ -12,7 +12,6 @@ const navLinks = [
   { name: "Team Management", href: "/dashboard/team", icon: Users },
 ];
 
-// This defines the props the component expects
 type SidebarProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -33,11 +32,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           <Link
             key={link.name}
             href={link.href}
+            onClick={onClose} // This onClick handler closes the sidebar on navigation
             className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg group ${
               isActive
                 ? "bg-blue-100 text-blue-700"
                 : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-            } `}
+            }`}
           >
             <link.icon className="mr-3 h-5 w-5 flex-shrink-0" />
             {link.name}
@@ -53,13 +53,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       <div
         className={`fixed inset-0 z-40 flex lg:hidden transition-opacity ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
       >
-        {/* Backdrop */}
         <div
           className="fixed inset-0 bg-black bg-opacity-60"
           onClick={onClose}
         ></div>
-
-        {/* Sidebar Panel */}
         <div
           className={`relative flex-1 flex flex-col max-w-xs w-full bg-white transition-transform duration-300 ease-in-out ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
         >
