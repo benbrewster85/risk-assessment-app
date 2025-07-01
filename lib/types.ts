@@ -199,3 +199,15 @@ export type VehicleEvent = {
         file_path: string;
     }[];
 };
+
+export type VehicleMileageLog = {
+    id: number;
+    journey_date: string;
+    start_mileage: number;
+    end_mileage: number | null;
+    notes: string | null;
+    user: {
+        first_name: string | null;
+        last_name: string | null;
+    } | null;
+};

@@ -23,7 +23,6 @@ export default async function VehiclesPage() {
   const teamId = profile?.team_id || null;
   const isCurrentUserAdmin = profile?.role === "team_admin";
 
-  // Fetch both the list of vehicles AND the list of team members
   const [vehiclesResult, teamMembersResult] = await Promise.all([
     supabase
       .from("vehicles_with_details")
@@ -46,6 +45,7 @@ export default async function VehiclesPage() {
       teamMembers={(teamMembersResult.data as TeamMember[]) || []}
       teamId={teamId}
       isCurrentUserAdmin={isCurrentUserAdmin}
+      currentUserId={user.id}
     />
   );
 }

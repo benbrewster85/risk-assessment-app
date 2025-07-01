@@ -2,7 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Vehicle, TeamMember, VehicleEvent } from "@/lib/types";
+import {
+  Vehicle,
+  TeamMember,
+  VehicleEvent,
+  VehicleMileageLog,
+} from "@/lib/types";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
 import {
@@ -21,6 +26,7 @@ type VehicleDetailPageProps = {
   initialVehicle: Vehicle;
   teamMembers: TeamMember[];
   initialEvents: VehicleEvent[];
+  initialMileageLogs: VehicleMileageLog[];
   isCurrentUserAdmin: boolean;
   currentUserId: string;
 };
@@ -32,6 +38,7 @@ const getStatus = (dueDate: string | null) => {
   today.setHours(0, 0, 0, 0);
   const thirtyDaysFromNow = new Date();
   thirtyDaysFromNow.setDate(today.getDate() + 30);
+
   if (due < today)
     return { text: "Overdue", Icon: AlertTriangle, color: "text-red-600" };
   if (due < thirtyDaysFromNow)
@@ -43,6 +50,7 @@ export default function VehicleDetailPage({
   initialVehicle,
   teamMembers,
   initialEvents,
+  initialMileageLogs,
   isCurrentUserAdmin,
   currentUserId,
 }: VehicleDetailPageProps) {
@@ -50,6 +58,7 @@ export default function VehicleDetailPage({
   const router = useRouter();
   const [vehicle, setVehicle] = useState(initialVehicle);
   const [events, setEvents] = useState(initialEvents);
+  const [mileageLogs, setMileageLogs] = useState(initialMileageLogs);
   const [selectedAssignee, setSelectedAssignee] = useState(
     initialVehicle.current_assignee_id || ""
   );
@@ -60,8 +69,9 @@ export default function VehicleDetailPage({
   useEffect(() => {
     setVehicle(initialVehicle);
     setEvents(initialEvents);
+    setMileageLogs(initialMileageLogs);
     setSelectedAssignee(initialVehicle.current_assignee_id || "");
-  }, [initialVehicle, initialEvents]);
+  }, [initialVehicle, initialEvents, initialMileageLogs]);
 
   const handleAssign = async () => {
     setIsAssigning(true);
@@ -69,6 +79,7 @@ export default function VehicleDetailPage({
       .from("vehicles")
       .update({ current_assignee_id: selectedAssignee || null })
       .eq("id", vehicle.id);
+
     if (error) {
       toast.error(`Failed to assign vehicle: ${error.message}`);
     } else {
@@ -92,14 +103,17 @@ export default function VehicleDetailPage({
 
   const assigneeName =
     `${(vehicle as any).assignee_first_name || ""} ${(vehicle as any).assignee_last_name || ""}`.trim();
-  const serviceDueDate = vehicle.last_serviced_date
-    ? new Date(
-        new Date(vehicle.last_serviced_date).setMonth(
-          new Date(vehicle.last_serviced_date).getMonth() +
-            vehicle.service_cycle_months
+
+  const serviceDueDate =
+    vehicle.last_serviced_date && vehicle.service_cycle_months
+      ? new Date(
+          new Date(vehicle.last_serviced_date).setMonth(
+            new Date(vehicle.last_serviced_date).getMonth() +
+              vehicle.service_cycle_months
+          )
         )
-      )
-    : null;
+      : null;
+
   const serviceStatus = getStatus(serviceDueDate?.toISOString() || null);
   const motStatus = getStatus(vehicle.mot_due_date);
 
@@ -131,6 +145,7 @@ export default function VehicleDetailPage({
             <span className="mx-2 text-gray-500">&gt;</span>
             <span className="text-gray-700">{vehicle.registration_number}</span>
           </div>
+
           <div className="bg-white rounded-lg shadow p-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="md:col-span-2 space-y-4">
@@ -214,6 +229,7 @@ export default function VehicleDetailPage({
               </div>
             </div>
           </div>
+
           <div className="bg-white rounded-lg shadow p-8">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold">Issue & Service Log</h2>
@@ -254,7 +270,6 @@ export default function VehicleDetailPage({
                             {new Date(event.created_at).toLocaleString("en-GB")}
                           </p>
                         </div>
-                        {/* UPDATED: Only show the status badge if the log type is 'Issue' */}
                         {event.log_type === "Issue" && (
                           <span
                             className={`px-2 py-0.5 text-xs font-semibold rounded-full ${event.status === "Open" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}`}
@@ -320,6 +335,66 @@ export default function VehicleDetailPage({
                   No issues or service events have been logged.
                 </p>
               )}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-8">
+            <h2 className="text-2xl font-bold mb-4">Mileage Log</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                      Driver
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                      Start
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                      End
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {mileageLogs.map((log) => (
+                    <tr key={log.id}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {new Date(log.journey_date).toLocaleDateString("en-GB")}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {`${log.user?.first_name || ""} ${log.user?.last_name || ""}`.trim()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {log.start_mileage}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {log.end_mileage || "N/A"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap font-semibold">
+                        {log.end_mileage
+                          ? log.end_mileage - log.start_mileage
+                          : "--"}
+                      </td>
+                    </tr>
+                  ))}
+                  {mileageLogs.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="text-center text-gray-500 py-8"
+                      >
+                        No mileage has been logged for this vehicle.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
