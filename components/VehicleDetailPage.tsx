@@ -16,11 +16,13 @@ import {
   CheckCircle,
   Tool,
   FileText,
+  Eye,
 } from "react-feather";
 import { useRouter } from "next/navigation";
 import LogVehicleIssueModal from "./LogVehicleIssueModal";
 import LogVehicleServiceModal from "./LogVehicleServiceModal";
 import StorageImage from "./StorageImage";
+import Modal from "./Modal";
 
 type VehicleDetailPageProps = {
   initialVehicle: Vehicle;
@@ -65,6 +67,7 @@ export default function VehicleDetailPage({
   const [isAssigning, setIsAssigning] = useState(false);
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
+  const [viewingNote, setViewingNote] = useState<string | null>(null);
 
   useEffect(() => {
     setVehicle(initialVehicle);
@@ -103,7 +106,6 @@ export default function VehicleDetailPage({
 
   const assigneeName =
     `${(vehicle as any).assignee_first_name || ""} ${(vehicle as any).assignee_last_name || ""}`.trim();
-
   const serviceDueDate =
     vehicle.last_serviced_date && vehicle.service_cycle_months
       ? new Date(
@@ -133,6 +135,25 @@ export default function VehicleDetailPage({
         vehicle={vehicle}
         userId={currentUserId}
       />
+
+      <Modal
+        title="Journey Note"
+        isOpen={viewingNote !== null}
+        onClose={() => setViewingNote(null)}
+      >
+        <p className="text-sm text-gray-700 whitespace-pre-wrap">
+          {viewingNote}
+        </p>
+        <div className="mt-6 text-right">
+          <button
+            onClick={() => setViewingNote(null)}
+            className="py-2 px-4 border rounded-md hover:bg-gray-50"
+          >
+            Close
+          </button>
+        </div>
+      </Modal>
+
       <div className="p-8">
         <div className="max-w-4xl mx-auto space-y-8">
           <div className="text-sm">
@@ -359,6 +380,9 @@ export default function VehicleDetailPage({
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                       Total
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                      Notes
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -381,12 +405,22 @@ export default function VehicleDetailPage({
                           ? log.end_mileage - log.start_mileage
                           : "--"}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {log.notes && (
+                          <button
+                            onClick={() => setViewingNote(log.notes)}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            <Eye size={18} />
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                   {mileageLogs.length === 0 && (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         className="text-center text-gray-500 py-8"
                       >
                         No mileage has been logged for this vehicle.
