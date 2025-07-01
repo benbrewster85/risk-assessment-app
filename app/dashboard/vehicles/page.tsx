@@ -16,12 +16,15 @@ export default async function VehiclesPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("team_id, role")
+    .select("team_id, role, is_fleet_manager") // Fetch the new flag
     .eq("id", user.id)
     .single();
 
   const teamId = profile?.team_id || null;
   const isCurrentUserAdmin = profile?.role === "team_admin";
+  // This new variable determines if the user has editing rights
+  const canCurrentUserEdit =
+    isCurrentUserAdmin || (profile?.is_fleet_manager ?? false);
 
   const [vehiclesResult, teamMembersResult] = await Promise.all([
     supabase
@@ -45,6 +48,7 @@ export default async function VehiclesPage() {
       teamMembers={(teamMembersResult.data as TeamMember[]) || []}
       teamId={teamId}
       isCurrentUserAdmin={isCurrentUserAdmin}
+      canCurrentUserEdit={canCurrentUserEdit} // Pass the new permission flag down
       currentUserId={user.id}
     />
   );

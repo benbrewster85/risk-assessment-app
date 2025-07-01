@@ -170,6 +170,7 @@ export type Vehicle = {
     registration_number: string;
     manufacturer: string | null;
     model: string | null;
+    owner_id: string | null; // This was the missing property
     current_assignee_id: string | null;
     last_serviced_date: string | null;
     service_cycle_months: number;

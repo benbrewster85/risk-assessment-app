@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Vehicle, TeamMember } from "@/lib/types";
 import AddVehicleModal from "./AddVehicleModal";
-import LogMileageModal from "./LogMileageModal";
 import { Plus, Download, Edit } from "react-feather";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-hot-toast";
@@ -16,6 +15,7 @@ type VehicleListPageProps = {
   teamMembers: TeamMember[];
   teamId: string | null;
   isCurrentUserAdmin: boolean;
+  canCurrentUserEdit: boolean; // New prop for edit permissions
   currentUserId: string;
 };
 
@@ -24,6 +24,7 @@ export default function VehicleListPage({
   teamMembers,
   teamId,
   isCurrentUserAdmin,
+  canCurrentUserEdit,
   currentUserId,
 }: VehicleListPageProps) {
   const supabase = createClient();
@@ -38,26 +39,13 @@ export default function VehicleListPage({
     setVehicles(initialVehicles);
   }, [initialVehicles]);
 
-  const handleSuccess = (newVehicle: Vehicle) => {
-    if (editingVehicle) {
-      setVehicles((current) =>
-        current.map((v) => (v.id === newVehicle.id ? newVehicle : v))
-      );
-    } else {
-      setVehicles((current) =>
-        [newVehicle, ...current].sort((a, b) =>
-          a.registration_number.localeCompare(b.registration_number)
-        )
-      );
-    }
+  const handleSuccess = () => {
     router.refresh();
   };
-
   const openCreateModal = () => {
     setEditingVehicle(null);
     setIsAddModalOpen(true);
   };
-
   const openEditModal = (vehicle: Vehicle) => {
     setEditingVehicle(vehicle);
     setIsAddModalOpen(true);
@@ -85,22 +73,15 @@ export default function VehicleListPage({
         onClose={() => setIsAddModalOpen(false)}
         onSuccess={handleSuccess}
         teamId={teamId}
+        teamMembers={teamMembers}
         vehicleToEdit={editingVehicle}
-      />
-      <LogMileageModal
-        isOpen={isMileageModalOpen}
-        onClose={() => setIsMileageModalOpen(false)}
-        onSuccess={() => router.refresh()}
-        vehicles={vehicles}
-        teamId={teamId}
-        userId={currentUserId}
       />
       <ConfirmModal
         isOpen={deletingVehicle !== null}
         onClose={() => setDeletingVehicle(null)}
         onConfirm={handleDeleteVehicle}
         title="Delete Vehicle"
-        message={`Are you sure you want to delete vehicle ${deletingVehicle?.registration_number}? This action cannot be undone.`}
+        message={`Are you sure you want to delete vehicle ${deletingVehicle?.registration_number}?`}
         isDestructive={true}
         confirmText="Delete"
       />
@@ -109,52 +90,47 @@ export default function VehicleListPage({
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-bold">Vehicle Management</h1>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setIsMileageModalOpen(true)}
-                className="bg-green-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-green-700 flex items-center transition-colors"
-              >
-                <Edit className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Log Journey</span>
-              </button>
-              {isCurrentUserAdmin && (
-                <>
-                  <a
-                    href="/api/vehicles/export"
-                    download
-                    className="bg-gray-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-gray-700 flex items-center transition-colors"
-                  >
-                    <Download className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Export</span>
-                  </a>
-                  <button
-                    onClick={openCreateModal}
-                    className="bg-blue-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-blue-700 flex items-center transition-colors"
-                  >
-                    <Plus className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">New Vehicle</span>
-                  </button>
-                </>
-              )}
-            </div>
+            {/* Only show the action buttons if the user has permission */}
+            {canCurrentUserEdit && (
+              <div className="flex space-x-2">
+                <a
+                  href="/api/vehicles/export"
+                  download
+                  className="bg-gray-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-gray-700 flex items-center transition-colors"
+                >
+                  <Download className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Export</span>
+                </a>
+                <button
+                  onClick={openCreateModal}
+                  className="bg-blue-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-blue-700 flex items-center transition-colors"
+                >
+                  <Plus className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">New Vehicle</span>
+                </button>
+              </div>
+            )}
           </div>
           <div className="bg-white rounded-lg shadow overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     Registration
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     Vehicle
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                    Owner
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     Assigned To
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     Service Due
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     MOT Due
                   </th>
                   <th className="relative px-6 py-3">
@@ -175,6 +151,8 @@ export default function VehicleListPage({
                       : null;
                   const assigneeName =
                     `${(vehicle as any).assignee_first_name || ""} ${(vehicle as any).assignee_last_name || ""}`.trim();
+                  const ownerName =
+                    `${(vehicle as any).owner_first_name || ""} ${(vehicle as any).owner_last_name || ""}`.trim();
 
                   return (
                     <tr key={vehicle.id}>
@@ -187,7 +165,7 @@ export default function VehicleListPage({
                         </Link>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium">
                           {vehicle.manufacturer}
                         </div>
                         <div className="text-sm text-gray-500">
@@ -195,14 +173,17 @@ export default function VehicleListPage({
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {assigneeName || "--"}
+                        {ownerName || "--"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {assigneeName || "--"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {serviceDueDate
                           ? serviceDueDate.toLocaleDateString("en-GB")
                           : "N/A"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {vehicle.mot_due_date
                           ? new Date(vehicle.mot_due_date).toLocaleDateString(
                               "en-GB"
@@ -210,19 +191,22 @@ export default function VehicleListPage({
                           : "N/A"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-4">
-                        <button
-                          onClick={() => openEditModal(vehicle)}
-                          className="text-indigo-600 hover:text-indigo-900"
-                        >
-                          Edit
-                        </button>
-                        {isCurrentUserAdmin && (
-                          <button
-                            onClick={() => setDeletingVehicle(vehicle)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Delete
-                          </button>
+                        {/* UPDATED: This button group is now conditional */}
+                        {canCurrentUserEdit && (
+                          <>
+                            <button
+                              onClick={() => openEditModal(vehicle)}
+                              className="text-indigo-600 hover:text-indigo-900"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => setDeletingVehicle(vehicle)}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              Delete
+                            </button>
+                          </>
                         )}
                       </td>
                     </tr>
@@ -230,8 +214,8 @@ export default function VehicleListPage({
                 })}
                 {vehicles.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-center text-gray-500 py-8">
-                      No vehicles have been added yet.
+                    <td colSpan={7} className="text-center text-gray-500 py-8">
+                      No vehicles added yet.
                     </td>
                   </tr>
                 )}

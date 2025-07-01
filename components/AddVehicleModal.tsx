@@ -4,14 +4,15 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-hot-toast";
 import Modal from "./Modal";
-import { Vehicle } from "@/lib/types";
+import { Vehicle, TeamMember } from "@/lib/types";
 
 type AddVehicleModalProps = {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (newVehicle: Vehicle) => void;
   teamId: string | null;
-  vehicleToEdit: Vehicle | null; // New prop to accept a vehicle for editing
+  teamMembers: TeamMember[];
+  vehicleToEdit: Vehicle | null;
 };
 
 export default function AddVehicleModal({
@@ -19,12 +20,14 @@ export default function AddVehicleModal({
   onClose,
   onSuccess,
   teamId,
+  teamMembers,
   vehicleToEdit,
 }: AddVehicleModalProps) {
   const supabase = createClient();
   const [registration, setRegistration] = useState("");
   const [manufacturer, setManufacturer] = useState("");
   const [model, setModel] = useState("");
+  const [ownerId, setOwnerId] = useState<string | null>("");
   const [lastServiced, setLastServiced] = useState("");
   const [serviceCycle, setServiceCycle] = useState(12);
   const [motDueDate, setMotDueDate] = useState("");
@@ -34,10 +37,11 @@ export default function AddVehicleModal({
 
   useEffect(() => {
     if (isOpen) {
-      if (isEditing) {
+      if (isEditing && vehicleToEdit) {
         setRegistration(vehicleToEdit.registration_number);
         setManufacturer(vehicleToEdit.manufacturer || "");
         setModel(vehicleToEdit.model || "");
+        setOwnerId(vehicleToEdit.owner_id || "");
         setLastServiced(vehicleToEdit.last_serviced_date || "");
         setServiceCycle(vehicleToEdit.service_cycle_months || 12);
         setMotDueDate(vehicleToEdit.mot_due_date || "");
@@ -45,6 +49,7 @@ export default function AddVehicleModal({
         setRegistration("");
         setManufacturer("");
         setModel("");
+        setOwnerId("");
         setLastServiced("");
         setServiceCycle(12);
         setMotDueDate("");
@@ -64,22 +69,24 @@ export default function AddVehicleModal({
       registration_number: registration.toUpperCase().replace(/\s/g, ""),
       manufacturer: manufacturer || null,
       model: model || null,
-      team_id: teamId,
+      owner_id: ownerId || null,
       last_serviced_date: lastServiced || null,
       service_cycle_months: serviceCycle,
       mot_due_date: motDueDate || null,
     };
-    const updateData = { ...vehicleData };
-    delete (updateData as any).team_id; // Don't update team_id on edit
 
     const { data, error } = isEditing
       ? await supabase
           .from("vehicles")
-          .update(updateData)
+          .update({ ...vehicleData, team_id: teamId })
           .eq("id", vehicleToEdit!.id)
           .select()
           .single()
-      : await supabase.from("vehicles").insert(vehicleData).select().single();
+      : await supabase
+          .from("vehicles")
+          .insert({ ...vehicleData, team_id: teamId })
+          .select()
+          .single();
 
     if (error) {
       toast.error(`Failed to save vehicle: ${error.message}`);
@@ -108,22 +115,40 @@ export default function AddVehicleModal({
               Registration Number
             </label>
             <input
-              type="text"
               id="registration"
+              type="text"
               value={registration}
               onChange={(e) => setRegistration(e.target.value)}
               required
               className="mt-1 block w-full"
             />
           </div>
-          <div></div>
+          <div>
+            <label htmlFor="owner" className="block text-sm font-medium">
+              Owner
+            </label>
+            <select
+              id="owner"
+              value={ownerId || ""}
+              onChange={(e) => setOwnerId(e.target.value)}
+              className="mt-1 block w-full"
+            >
+              <option value="">(No specific owner)</option>
+              {teamMembers.map((member) => (
+                <option
+                  key={member.id}
+                  value={member.id}
+                >{`${member.first_name} ${member.last_name}`}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label htmlFor="manufacturer" className="block text-sm font-medium">
               Manufacturer
             </label>
             <input
-              type="text"
               id="manufacturer"
+              type="text"
               value={manufacturer}
               onChange={(e) => setManufacturer(e.target.value)}
               className="mt-1 block w-full"
@@ -134,8 +159,8 @@ export default function AddVehicleModal({
               Model
             </label>
             <input
-              type="text"
               id="model"
+              type="text"
               value={model}
               onChange={(e) => setModel(e.target.value)}
               className="mt-1 block w-full"
@@ -148,8 +173,8 @@ export default function AddVehicleModal({
               Last Service Date
             </label>
             <input
-              type="date"
               id="lastServiced"
+              type="date"
               value={lastServiced}
               onChange={(e) => setLastServiced(e.target.value)}
               className="mt-1 block w-full"
@@ -194,11 +219,7 @@ export default function AddVehicleModal({
             disabled={isSubmitting}
             className="py-2 px-4 border rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
           >
-            {isSubmitting
-              ? "Saving..."
-              : isEditing
-                ? "Save Changes"
-                : "Add Vehicle"}
+            {isEditing ? "Save Changes" : "Add Vehicle"}
           </button>
         </div>
       </form>
