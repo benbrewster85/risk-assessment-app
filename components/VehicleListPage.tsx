@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Vehicle, TeamMember } from "@/lib/types";
 import AddVehicleModal from "./AddVehicleModal";
+import LogMileageModal from "./LogMileageModal";
 import { Plus, Download, Edit } from "react-feather";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-hot-toast";
@@ -15,7 +16,7 @@ type VehicleListPageProps = {
   teamMembers: TeamMember[];
   teamId: string | null;
   isCurrentUserAdmin: boolean;
-  canCurrentUserEdit: boolean; // New prop for edit permissions
+  canCurrentUserEdit: boolean;
   currentUserId: string;
 };
 
@@ -24,7 +25,6 @@ export default function VehicleListPage({
   teamMembers,
   teamId,
   isCurrentUserAdmin,
-  canCurrentUserEdit,
   currentUserId,
 }: VehicleListPageProps) {
   const supabase = createClient();
@@ -42,10 +42,12 @@ export default function VehicleListPage({
   const handleSuccess = () => {
     router.refresh();
   };
+
   const openCreateModal = () => {
     setEditingVehicle(null);
     setIsAddModalOpen(true);
   };
+
   const openEditModal = (vehicle: Vehicle) => {
     setEditingVehicle(vehicle);
     setIsAddModalOpen(true);
@@ -76,12 +78,20 @@ export default function VehicleListPage({
         teamMembers={teamMembers}
         vehicleToEdit={editingVehicle}
       />
+      <LogMileageModal
+        isOpen={isMileageModalOpen}
+        onClose={() => setIsMileageModalOpen(false)}
+        onSuccess={handleSuccess}
+        vehicles={vehicles}
+        teamId={teamId}
+        userId={currentUserId}
+      />
       <ConfirmModal
         isOpen={deletingVehicle !== null}
         onClose={() => setDeletingVehicle(null)}
         onConfirm={handleDeleteVehicle}
         title="Delete Vehicle"
-        message={`Are you sure you want to delete vehicle ${deletingVehicle?.registration_number}?`}
+        message={`Are you sure you want to delete vehicle ${deletingVehicle?.registration_number}? This action cannot be undone.`}
         isDestructive={true}
         confirmText="Delete"
       />
@@ -90,47 +100,55 @@ export default function VehicleListPage({
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-bold">Vehicle Management</h1>
-            {/* Only show the action buttons if the user has permission */}
-            {canCurrentUserEdit && (
-              <div className="flex space-x-2">
-                <a
-                  href="/api/vehicles/export"
-                  download
-                  className="bg-gray-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-gray-700 flex items-center transition-colors"
-                >
-                  <Download className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Export</span>
-                </a>
-                <button
-                  onClick={openCreateModal}
-                  className="bg-blue-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-blue-700 flex items-center transition-colors"
-                >
-                  <Plus className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">New Vehicle</span>
-                </button>
-              </div>
-            )}
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setIsMileageModalOpen(true)}
+                className="bg-green-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-green-700 flex items-center transition-colors"
+              >
+                <Edit className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Log Journey</span>
+              </button>
+              {isCurrentUserAdmin && (
+                <>
+                  <a
+                    href="/api/vehicles/export"
+                    download
+                    className="bg-gray-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-gray-700 flex items-center transition-colors"
+                  >
+                    <Download className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Export</span>
+                  </a>
+                  <button
+                    onClick={openCreateModal}
+                    className="bg-blue-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-blue-700 flex items-center transition-colors"
+                  >
+                    <Plus className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">New Vehicle</span>
+                  </button>
+                </>
+              )}
+            </div>
           </div>
           <div className="bg-white rounded-lg shadow overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Registration
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Vehicle
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Owner
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Assigned To
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Service Due
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     MOT Due
                   </th>
                   <th className="relative px-6 py-3">
@@ -165,7 +183,7 @@ export default function VehicleListPage({
                         </Link>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium">
+                        <div className="text-sm font-medium text-gray-900">
                           {vehicle.manufacturer}
                         </div>
                         <div className="text-sm text-gray-500">
@@ -191,8 +209,7 @@ export default function VehicleListPage({
                           : "N/A"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-4">
-                        {/* UPDATED: This button group is now conditional */}
-                        {canCurrentUserEdit && (
+                        {isCurrentUserAdmin && (
                           <>
                             <button
                               onClick={() => openEditModal(vehicle)}
