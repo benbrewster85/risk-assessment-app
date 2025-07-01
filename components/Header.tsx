@@ -16,12 +16,14 @@ import { useState, useEffect, useRef } from "react";
 type HeaderProps = {
   team: Team | null;
   isSuperAdmin: boolean;
+  userName: string | null; // New prop for the user's name
   onMenuClick: () => void;
 };
 
 export default function Header({
   team,
   isSuperAdmin,
+  userName,
   onMenuClick,
 }: HeaderProps) {
   const supabase = createClient();
@@ -80,6 +82,10 @@ export default function Header({
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100"
             >
+              {/* Display the user's name */}
+              <span className="hidden sm:inline text-sm font-medium text-gray-700">
+                {userName || "Account"}
+              </span>
               <UserIcon className="h-5 w-5 text-gray-600" />
               <ChevronDown
                 className={`h-4 w-4 text-gray-600 transition-transform ${isMenuOpen ? "rotate-180" : ""}`}
@@ -88,32 +94,38 @@ export default function Header({
             {isMenuOpen && (
               <div className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
                 <div className="py-1" role="menu" aria-orientation="vertical">
-                  <Link
-                    href="/dashboard/profile"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    role="menuitem"
-                  >
-                    My Profile
-                  </Link>
-                  <Link
-                    href="/dashboard/team"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    role="menuitem"
-                  >
-                    Team Management
-                  </Link>
-                  {isSuperAdmin && (
+                  <div className="px-4 py-2 text-sm text-gray-500 border-b">
+                    <p className="font-semibold">Signed in as</p>
+                    <p className="truncate">{userName}</p>
+                  </div>
+                  <div className="py-1">
                     <Link
-                      href="/dashboard/super-admin"
+                      href="/dashboard/profile"
                       onClick={() => setIsMenuOpen(false)}
-                      className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       role="menuitem"
                     >
-                      Super Admin
+                      My Profile
                     </Link>
-                  )}
+                    <Link
+                      href="/dashboard/team"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      role="menuitem"
+                    >
+                      Team Management
+                    </Link>
+                    {isSuperAdmin && (
+                      <Link
+                        href="/dashboard/super-admin"
+                        onClick={() => setIsMenuOpen(false)}
+                        className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                        role="menuitem"
+                      >
+                        Super Admin
+                      </Link>
+                    )}
+                  </div>
                   <div className="border-t border-gray-100 my-1"></div>
                   <button
                     onClick={handleLogout}
