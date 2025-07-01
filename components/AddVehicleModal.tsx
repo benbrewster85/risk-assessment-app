@@ -11,6 +11,7 @@ type AddVehicleModalProps = {
   onClose: () => void;
   onSuccess: (newVehicle: Vehicle) => void;
   teamId: string | null;
+  vehicleToEdit: Vehicle | null; // New prop to accept a vehicle for editing
 };
 
 export default function AddVehicleModal({
@@ -18,6 +19,7 @@ export default function AddVehicleModal({
   onClose,
   onSuccess,
   teamId,
+  vehicleToEdit,
 }: AddVehicleModalProps) {
   const supabase = createClient();
   const [registration, setRegistration] = useState("");
@@ -28,17 +30,27 @@ export default function AddVehicleModal({
   const [motDueDate, setMotDueDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Reset form when the modal opens
+  const isEditing = vehicleToEdit !== null;
+
   useEffect(() => {
     if (isOpen) {
-      setRegistration("");
-      setManufacturer("");
-      setModel("");
-      setLastServiced("");
-      setServiceCycle(12);
-      setMotDueDate("");
+      if (isEditing) {
+        setRegistration(vehicleToEdit.registration_number);
+        setManufacturer(vehicleToEdit.manufacturer || "");
+        setModel(vehicleToEdit.model || "");
+        setLastServiced(vehicleToEdit.last_serviced_date || "");
+        setServiceCycle(vehicleToEdit.service_cycle_months || 12);
+        setMotDueDate(vehicleToEdit.mot_due_date || "");
+      } else {
+        setRegistration("");
+        setManufacturer("");
+        setModel("");
+        setLastServiced("");
+        setServiceCycle(12);
+        setMotDueDate("");
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, vehicleToEdit, isEditing]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,17 +69,22 @@ export default function AddVehicleModal({
       service_cycle_months: serviceCycle,
       mot_due_date: motDueDate || null,
     };
+    const updateData = { ...vehicleData };
+    delete (updateData as any).team_id; // Don't update team_id on edit
 
-    const { data, error } = await supabase
-      .from("vehicles")
-      .insert(vehicleData)
-      .select()
-      .single();
+    const { data, error } = isEditing
+      ? await supabase
+          .from("vehicles")
+          .update(updateData)
+          .eq("id", vehicleToEdit!.id)
+          .select()
+          .single()
+      : await supabase.from("vehicles").insert(vehicleData).select().single();
 
     if (error) {
-      toast.error(`Failed to add vehicle: ${error.message}`);
+      toast.error(`Failed to save vehicle: ${error.message}`);
     } else if (data) {
-      toast.success("Vehicle added successfully!");
+      toast.success(`Vehicle ${isEditing ? "updated" : "added"} successfully!`);
       onSuccess(data as Vehicle);
       onClose();
     }
@@ -75,7 +92,15 @@ export default function AddVehicleModal({
   };
 
   return (
-    <Modal title="Add New Vehicle" isOpen={isOpen} onClose={onClose}>
+    <Modal
+      title={
+        isEditing
+          ? `Edit ${vehicleToEdit?.registration_number}`
+          : "Add New Vehicle"
+      }
+      isOpen={isOpen}
+      onClose={onClose}
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -91,7 +116,7 @@ export default function AddVehicleModal({
               className="mt-1 block w-full"
             />
           </div>
-          <div></div> {/* Empty div for layout spacing */}
+          <div></div>
           <div>
             <label htmlFor="manufacturer" className="block text-sm font-medium">
               Manufacturer
@@ -117,7 +142,6 @@ export default function AddVehicleModal({
             />
           </div>
         </div>
-
         <div className="border-t pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label htmlFor="lastServiced" className="block text-sm font-medium">
@@ -157,7 +181,6 @@ export default function AddVehicleModal({
             />
           </div>
         </div>
-
         <div className="mt-6 flex justify-end">
           <button
             type="button"
@@ -171,7 +194,11 @@ export default function AddVehicleModal({
             disabled={isSubmitting}
             className="py-2 px-4 border rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
           >
-            {isSubmitting ? "Saving..." : "Add Vehicle"}
+            {isSubmitting
+              ? "Saving..."
+              : isEditing
+                ? "Save Changes"
+                : "Add Vehicle"}
           </button>
         </div>
       </form>

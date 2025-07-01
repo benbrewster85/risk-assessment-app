@@ -26,19 +26,36 @@ export default function VehicleListPage({
   const supabase = createClient();
   const router = useRouter();
   const [vehicles, setVehicles] = useState(initialVehicles);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [deletingVehicle, setDeletingVehicle] = useState<Vehicle | null>(null);
 
   useEffect(() => {
     setVehicles(initialVehicles);
   }, [initialVehicles]);
 
-  const handleSuccess = (newVehicle: Vehicle) => {
-    setVehicles((current) =>
-      [newVehicle, ...current].sort((a, b) =>
-        a.registration_number.localeCompare(b.registration_number)
-      )
-    );
+  const handleSuccess = (updatedVehicle: Vehicle) => {
+    if (editingVehicle) {
+      setVehicles((current) =>
+        current.map((v) => (v.id === updatedVehicle.id ? updatedVehicle : v))
+      );
+    } else {
+      setVehicles((current) =>
+        [updatedVehicle, ...current].sort((a, b) =>
+          a.registration_number.localeCompare(b.registration_number)
+        )
+      );
+    }
+  };
+
+  const openCreateModal = () => {
+    setEditingVehicle(null);
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (vehicle: Vehicle) => {
+    setEditingVehicle(vehicle);
+    setIsModalOpen(true);
   };
 
   const handleDeleteVehicle = async () => {
@@ -59,10 +76,11 @@ export default function VehicleListPage({
   return (
     <>
       <AddVehicleModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         onSuccess={handleSuccess}
         teamId={teamId}
+        vehicleToEdit={editingVehicle}
       />
       <ConfirmModal
         isOpen={deletingVehicle !== null}
@@ -73,7 +91,6 @@ export default function VehicleListPage({
         isDestructive={true}
         confirmText="Delete"
       />
-
       <div className="p-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-8">
@@ -89,7 +106,7 @@ export default function VehicleListPage({
                   <span className="hidden sm:inline">Export</span>
                 </a>
                 <button
-                  onClick={() => setIsAddModalOpen(true)}
+                  onClick={openCreateModal}
                   className="bg-blue-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-blue-700 flex items-center transition-colors"
                 >
                   <Plus className="h-4 w-4 sm:mr-2" />
@@ -102,19 +119,19 @@ export default function VehicleListPage({
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     Registration
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     Vehicle
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     Assigned To
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     Service Due
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     MOT Due
                   </th>
                   <th className="relative px-6 py-3">
@@ -124,19 +141,20 @@ export default function VehicleListPage({
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {vehicles.map((vehicle) => {
-                  const serviceDueDate =
-                    vehicle.last_serviced_date && vehicle.service_cycle_months
-                      ? new Date(
-                          new Date(vehicle.last_serviced_date).setMonth(
-                            new Date(vehicle.last_serviced_date).getMonth() +
-                              vehicle.service_cycle_months
-                          )
+                  const serviceDueDate = vehicle.last_serviced_date
+                    ? new Date(
+                        new Date(vehicle.last_serviced_date).setMonth(
+                          new Date(vehicle.last_serviced_date).getMonth() +
+                            vehicle.service_cycle_months
                         )
-                      : null;
-
-                  const assigneeName =
-                    `${(vehicle as any).assignee_first_name || ""} ${(vehicle as any).assignee_last_name || ""}`.trim();
-
+                      )
+                    : null;
+                  const assignee = teamMembers.find(
+                    (m) => m.id === vehicle.current_assignee_id
+                  );
+                  const assigneeName = assignee
+                    ? `${assignee.first_name} ${assignee.last_name}`
+                    : "";
                   return (
                     <tr key={vehicle.id}>
                       <td className="px-6 py-4 whitespace-nowrap font-mono text-sm font-semibold">
@@ -172,12 +190,20 @@ export default function VehicleListPage({
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-4">
                         {isCurrentUserAdmin && (
-                          <button
-                            onClick={() => setDeletingVehicle(vehicle)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Delete
-                          </button>
+                          <>
+                            <button
+                              onClick={() => openEditModal(vehicle)}
+                              className="text-indigo-600 hover:text-indigo-900"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => setDeletingVehicle(vehicle)}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              Delete
+                            </button>
+                          </>
                         )}
                       </td>
                     </tr>
