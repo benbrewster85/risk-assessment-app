@@ -212,3 +212,37 @@ export type VehicleMileageLog = {
         last_name: string | null;
     } | null;
 };
+
+export type ShiftReport = {
+    id: string;
+    created_at: string;
+    start_time: string;
+    end_time: string | null;
+    work_completed: string | null;
+    notes: string | null;
+    project: {
+        id: string;
+        name: string;
+    } | null;
+    created_by: {
+        first_name: string | null;
+        last_name: string | null;
+    } | null;
+};
+
+// In lib/types.ts (add this with your other types)
+
+export type AssetActivityLog = {
+    shift_report: {
+        id: string;
+        start_time: string;
+        project: {
+            id: string;
+            name: string;
+        } | null;
+        created_by: {
+            first_name: string | null;
+            last_name: string | null;
+        } | null;
+    } | null;
+};

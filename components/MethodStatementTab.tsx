@@ -2,39 +2,51 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { Project } from "@/lib/types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 
 type MethodStatementTabProps = {
   project: Project;
   isCurrentUserAdmin: boolean;
+  onUpdate: (updatedProject: Project) => void; // New prop
 };
 
 export default function MethodStatementTab({
   project,
   isCurrentUserAdmin,
+  onUpdate,
 }: MethodStatementTabProps) {
   const supabase = createClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // This state will hold the content of the text area
   const [methodStatement, setMethodStatement] = useState(
     project.method_statement || ""
   );
+
+  useEffect(() => {
+    setMethodStatement(project.method_statement || "");
+  }, [project]);
 
   const handleSaveChanges = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const { error } = await supabase
+    const updateData = {
+      method_statement: methodStatement,
+      last_edited_at: new Date().toISOString(),
+    };
+
+    const { data: updatedProject, error } = await supabase
       .from("projects")
-      .update({ method_statement: methodStatement })
-      .eq("id", project.id);
+      .update(updateData)
+      .eq("id", project.id)
+      .select("*")
+      .single();
 
     if (error) {
       toast.error(`Failed to save Method Statement: ${error.message}`);
-    } else {
+    } else if (updatedProject) {
       toast.success("Method Statement saved successfully!");
+      onUpdate(updatedProject); // Notify the parent page
     }
     setIsSubmitting(false);
   };
@@ -58,18 +70,16 @@ export default function MethodStatementTab({
           id="methodStatement"
           value={methodStatement}
           onChange={(e) => setMethodStatement(e.target.value)}
-          rows={25}
-          className="block w-full rounded-md border-gray-300 shadow-sm font-mono text-sm focus:ring-blue-500 focus:border-blue-500 read-only:bg-gray-50"
+          rows={20}
+          className="block w-full"
           readOnly={!isCurrentUserAdmin}
           placeholder={
             isCurrentUserAdmin
-              ? "Start writing your method statement here..."
-              : "No method statement has been written yet."
+              ? "Start writing here..."
+              : "No method statement written yet."
           }
         />
       </div>
-
-      {/* The save button is only shown to admins */}
       {isCurrentUserAdmin && (
         <div className="flex justify-end pt-4">
           <button

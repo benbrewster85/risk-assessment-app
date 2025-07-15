@@ -9,9 +9,8 @@ import { Vehicle, TeamMember } from "@/lib/types";
 type AddVehicleModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (newVehicle: Vehicle) => void;
+  onSuccess: (vehicle: Vehicle) => void;
   teamId: string | null;
-  teamMembers: TeamMember[];
   vehicleToEdit: Vehicle | null;
 };
 
@@ -20,14 +19,12 @@ export default function AddVehicleModal({
   onClose,
   onSuccess,
   teamId,
-  teamMembers,
   vehicleToEdit,
 }: AddVehicleModalProps) {
   const supabase = createClient();
   const [registration, setRegistration] = useState("");
   const [manufacturer, setManufacturer] = useState("");
   const [model, setModel] = useState("");
-  const [ownerId, setOwnerId] = useState<string | null>("");
   const [lastServiced, setLastServiced] = useState("");
   const [serviceCycle, setServiceCycle] = useState(12);
   const [motDueDate, setMotDueDate] = useState("");
@@ -41,7 +38,6 @@ export default function AddVehicleModal({
         setRegistration(vehicleToEdit.registration_number);
         setManufacturer(vehicleToEdit.manufacturer || "");
         setModel(vehicleToEdit.model || "");
-        setOwnerId(vehicleToEdit.owner_id || "");
         setLastServiced(vehicleToEdit.last_serviced_date || "");
         setServiceCycle(vehicleToEdit.service_cycle_months || 12);
         setMotDueDate(vehicleToEdit.mot_due_date || "");
@@ -49,7 +45,6 @@ export default function AddVehicleModal({
         setRegistration("");
         setManufacturer("");
         setModel("");
-        setOwnerId("");
         setLastServiced("");
         setServiceCycle(12);
         setMotDueDate("");
@@ -69,7 +64,6 @@ export default function AddVehicleModal({
       registration_number: registration.toUpperCase().replace(/\s/g, ""),
       manufacturer: manufacturer || null,
       model: model || null,
-      owner_id: ownerId || null,
       last_serviced_date: lastServiced || null,
       service_cycle_months: serviceCycle,
       mot_due_date: motDueDate || null,
@@ -122,25 +116,6 @@ export default function AddVehicleModal({
               required
               className="mt-1 block w-full"
             />
-          </div>
-          <div>
-            <label htmlFor="owner" className="block text-sm font-medium">
-              Owner
-            </label>
-            <select
-              id="owner"
-              value={ownerId || ""}
-              onChange={(e) => setOwnerId(e.target.value)}
-              className="mt-1 block w-full"
-            >
-              <option value="">(No specific owner)</option>
-              {teamMembers.map((member) => (
-                <option
-                  key={member.id}
-                  value={member.id}
-                >{`${member.first_name} ${member.last_name}`}</option>
-              ))}
-            </select>
           </div>
           <div>
             <label htmlFor="manufacturer" className="block text-sm font-medium">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Asset, TeamMember, AssetIssue } from "@/lib/types";
+import { Asset, TeamMember, AssetIssue, AssetActivityLog } from "@/lib/types";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
 import {
@@ -20,8 +20,8 @@ import StatusBadge from "./StatusBadge";
 import LogAssetIssueModal from "./LogAssetIssueModal";
 import LogMaintenanceModal from "./LogMaintenanceModal";
 import ResolveIssueModal from "./ResolveIssueModal";
-import AssetQrCode from "./AssetQrCode"; // Import the QR code component
 import StorageImage from "./StorageImage";
+import AssetQrCode from "./AssetQrCode";
 
 type ChildAsset = { id: string; system_id: string; model: string | null };
 type Status = { id: string; name: string };
@@ -34,6 +34,7 @@ type AssetDetailPageProps = {
   assetStatuses: Status[];
   isCurrentUserAdmin: boolean;
   initialIssues: AssetIssue[];
+  initialActivityLog: AssetActivityLog[];
   currentUserId: string;
 };
 
@@ -45,14 +46,17 @@ export default function AssetDetailPage({
   assetStatuses,
   isCurrentUserAdmin,
   initialIssues,
+  initialActivityLog,
   currentUserId,
 }: AssetDetailPageProps) {
   const supabase = createClient();
   const router = useRouter();
   const [asset, setAsset] = useState(initialAsset);
+  const [children, setChildren] = useState(childAssets);
   const [issues, setIssues] = useState(initialIssues);
+  const [activityLog, setActivityLog] = useState(initialActivityLog);
   const [selectedAssignee, setSelectedAssignee] = useState(
-    initialAsset.current_assignee_id || ""
+    asset.current_assignee_id || ""
   );
   const [isAssigning, setIsAssigning] = useState(false);
   const [selectedChildId, setSelectedChildId] = useState("");
@@ -61,13 +65,13 @@ export default function AssetDetailPage({
   const [isLogMaintenanceModalOpen, setIsLogMaintenanceModalOpen] =
     useState(false);
   const [resolvingIssue, setResolvingIssue] = useState<AssetIssue | null>(null);
-  const [signedUrls, setSignedUrls] = useState<Map<string, string>>(new Map());
 
-  // This effect ensures the component's state stays in sync with new data after a refresh
   useEffect(() => {
     setAsset(initialAsset);
+    setChildren(childAssets);
     setIssues(initialIssues);
-  }, [initialAsset, initialIssues]);
+    setActivityLog(initialActivityLog);
+  }, [initialAsset, childAssets, initialIssues, initialActivityLog]);
 
   const handleAssign = async () => {
     setIsAssigning(true);
@@ -252,7 +256,7 @@ export default function AssetDetailPage({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2 space-y-4">
                 <div>
-                  <h1 className="text-3xl font-bold">
+                  <h1 className="text-2xl md:text-3xl font-bold">
                     {asset.manufacturer} {asset.model}
                   </h1>
                   <p className="text-lg text-gray-500">
@@ -307,19 +311,21 @@ export default function AssetDetailPage({
                       year: "numeric",
                     })}
                   </p>
-                  <div className="p-4 bg-slate-50 rounded-lg max-w-xs">
-                    <h3 className="text-sm font-medium mb-2">QR Code Label</h3>
-                    <div className="bg-white p-4 flex justify-start rounded-md">
-                      <AssetQrCode assetId={asset.id} />
-                    </div>
-                    <button
-                      onClick={() => window.print()}
-                      className="w-full mt-2 text-sm py-2 px-4 border rounded-md hover:bg-gray-100 flex items-center justify-start"
-                    >
-                      <Printer className="h-4 w-4 mr-2" />
-                      Print Label
-                    </button>
+                </div>
+                <div className="pt-6 max-w-xs">
+                  <h3 className="text-sm font-medium mb-2 text-gray-600">
+                    QR Code Label
+                  </h3>
+                  <div className="bg-white p-4 border rounded-md flex justify-start">
+                    <AssetQrCode assetId={asset.id} />
                   </div>
+                  <button
+                    onClick={() => window.print()}
+                    className="w-full mt-2 text-sm py-2 px-4 border rounded-md hover:bg-gray-100 flex items-center justify-center"
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print Label
+                  </button>
                 </div>
               </div>
               <div className="lg:col-span-1 space-y-4">
@@ -459,21 +465,18 @@ export default function AssetDetailPage({
           <div className="bg-white rounded-lg shadow p-8">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold">Issue & Maintenance Log</h2>
-
               <div className="flex space-x-2">
                 <button
                   onClick={() => setIsLogMaintenanceModalOpen(true)}
-                  className="bg-blue-600 text-white font-bold py-2 px-3 text-sm rounded-lg hover:bg-blue-700 flex items-center"
+                  className="bg-blue-600 text-white font-bold py-2 px-3 text-sm rounded-lg hover:bg-blue-700"
                 >
-                  <Tool className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Log Maintenance</span>
+                  + Log Maintenance
                 </button>
                 <button
                   onClick={() => setIsLogIssueModalOpen(true)}
-                  className="bg-orange-600 text-white font-bold py-2 px-3 text-sm rounded-lg hover:bg-orange-700 flex items-center"
+                  className="bg-orange-600 text-white font-bold py-2 px-3 text-sm rounded-lg hover:bg-orange-700"
                 >
-                  <AlertTriangle className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Log Issue</span>
+                  + Log Issue
                 </button>
               </div>
             </div>
@@ -512,17 +515,24 @@ export default function AssetDetailPage({
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {issue.photos.map((p) => {
-                          // We removed the surrounding <a> tag.
-                          // The StorageImage component now handles the click itself.
                           if (!p.file_path) return null;
+                          const isPdf = p.file_path
+                            .toLowerCase()
+                            .endsWith(".pdf");
                           return (
-                            <StorageImage
+                            <a
                               key={p.id}
-                              filePath={p.file_path}
-                              bucket="asset-issue-photos"
-                              alt="Issue attachment"
-                              className="h-24 w-24"
-                            />
+                              href={p.file_path}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <StorageImage
+                                filePath={p.file_path}
+                                bucket="asset-issue-photos"
+                                alt="Issue attachment"
+                                className="h-24 w-24 object-cover rounded-md border hover:opacity-80"
+                              />
+                            </a>
                           );
                         })}
                       </div>
@@ -562,6 +572,71 @@ export default function AssetDetailPage({
                   No issues or maintenance have been logged for this asset.
                 </p>
               )}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-8">
+            <h2 className="text-2xl font-bold mb-4">Activity Log</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                      Project
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                      Logged By
+                    </th>
+                    <th className="relative px-6 py-3">
+                      <span className="sr-only">View</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {initialActivityLog.length > 0 ? (
+                    initialActivityLog.map((log) => {
+                      if (!log.shift_report) return null;
+                      const userName =
+                        `${log.shift_report.created_by?.first_name || ""} ${log.shift_report.created_by?.last_name || ""}`.trim();
+                      return (
+                        <tr key={log.shift_report.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {new Date(
+                              log.shift_report.start_time
+                            ).toLocaleDateString("en-GB")}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {log.shift_report.project?.name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {userName}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <Link
+                              href={`/dashboard/logs/${log.shift_report.id}`}
+                              className="text-indigo-600 hover:text-indigo-900"
+                            >
+                              View Report
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="text-center text-gray-500 py-8"
+                      >
+                        This asset has not been used in any shift reports.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

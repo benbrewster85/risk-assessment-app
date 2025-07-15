@@ -2,18 +2,20 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { Project } from "@/lib/types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 
 // UPDATED: The component now accepts the user's admin status
 type ProjectDetailsTabProps = {
   project: Project;
   isCurrentUserAdmin: boolean;
+  onUpdate: (updatedProject: Project) => void; // New prop
 };
 
 export default function ProjectDetailsTab({
   project,
   isCurrentUserAdmin,
+  onUpdate,
 }: ProjectDetailsTabProps) {
   const supabase = createClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,29 +31,48 @@ export default function ProjectDetailsTab({
   const [version, setVersion] = useState(project.version || "1.0");
   const [status, setStatus] = useState(project.document_status || "Draft");
 
+  // This hook keeps the form in sync if the parent data changes
+  useEffect(() => {
+    setName(project.name);
+    setReference(project.reference || "");
+    setAddress(project.location_address || "");
+    setW3w(project.location_what3words || "");
+    setScope(project.scope || "");
+    setAuthor(project.author || "");
+    setReviewer(project.reviewer || "");
+    setVersion(project.version || "1.0");
+    setStatus(project.document_status || "Draft");
+  }, [project]);
+
   const handleSaveChanges = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const { error } = await supabase
+    const updateData = {
+      name,
+      reference,
+      version,
+      document_status: status,
+      location_address: address,
+      location_what3words: w3w,
+      scope,
+      author,
+      reviewer,
+      last_edited_at: new Date().toISOString(),
+    };
+
+    const { data: updatedProject, error } = await supabase
       .from("projects")
-      .update({
-        name,
-        reference,
-        location_address: address,
-        location_what3words: w3w,
-        scope,
-        author,
-        reviewer,
-        version,
-        document_status: status,
-      })
-      .eq("id", project.id);
+      .update(updateData)
+      .eq("id", project.id)
+      .select("*")
+      .single();
 
     if (error) {
       toast.error(`Failed to save changes: ${error.message}`);
-    } else {
+    } else if (updatedProject) {
       toast.success("Project details saved successfully!");
+      onUpdate(updatedProject); // Notify the parent page of the change
     }
     setIsSubmitting(false);
   };

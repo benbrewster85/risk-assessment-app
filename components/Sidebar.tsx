@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Folder, HardDrive, Truck, Users } from "react-feather";
+import { Home, Folder, HardDrive, Truck, Users, FileText } from "react-feather";
 
 const navLinks = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
   { name: "Projects", href: "/dashboard/projects", icon: Folder },
+  { name: "Logs & Records", href: "/dashboard/logs", icon: FileText },
   { name: "Asset Management", href: "/dashboard/assets", icon: HardDrive },
   { name: "Vehicle Management", href: "/dashboard/vehicles", icon: Truck },
   { name: "Team Management", href: "/dashboard/team", icon: Users },
@@ -27,12 +28,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           link.href === "/dashboard"
             ? pathname === link.href
             : pathname.startsWith(link.href);
-
         return (
           <Link
             key={link.name}
             href={link.href}
-            onClick={onClose} // This onClick handler closes the sidebar on navigation
+            onClick={onClose}
             className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg group ${
               isActive
                 ? "bg-blue-100 text-blue-700"
@@ -49,7 +49,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   return (
     <>
-      {/* Mobile Sidebar with backdrop */}
+      {/* Mobile Sidebar */}
       <div
         className={`fixed inset-0 z-40 flex lg:hidden transition-opacity ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
       >
@@ -63,7 +63,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           {sidebarContent}
         </div>
       </div>
-
       {/* Desktop Sidebar */}
       <aside className="w-64 flex-shrink-0 bg-white border-r border-gray-200 hidden lg:flex flex-col print:hidden">
         {sidebarContent}

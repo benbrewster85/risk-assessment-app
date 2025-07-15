@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import AssetDetailPage from "@/components/AssetDetailPage";
-import { Asset, TeamMember, AssetIssue } from "@/lib/types";
+import { Asset, TeamMember, AssetIssue, AssetActivityLog } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +27,7 @@ export default async function AssetPage({ params }: AssetPageProps) {
   const teamId = profile.team_id;
   const currentUserRole = profile.role;
 
+  // Fetch the main asset's details
   const { data: assetResult, error: assetError } = await supabase
     .from("assets_with_details")
     .select("*")
@@ -38,18 +39,19 @@ export default async function AssetPage({ params }: AssetPageProps) {
     notFound();
   }
 
+  // Fetch all related data for the page in parallel
   const [
     teamMembersResult,
     childAssetsResult,
     availableAssetsResult,
     statusesResult,
     issuesResult,
+    activityLogResult,
   ] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, first_name, last_name")
-      .eq("team_id", teamId)
-      .order("first_name"),
+      .eq("team_id", teamId),
     supabase
       .from("assets")
       .select("id, system_id, model")
@@ -69,10 +71,21 @@ export default async function AssetPage({ params }: AssetPageProps) {
     supabase
       .from("asset_issues")
       .select(
-        "*, reporter:reported_by_id(first_name, last_name), resolver:resolved_by_id(first_name, last_name), photos:asset_issue_photos(id, file_path)"
+        "*, reporter:reported_by_id(*), resolver:resolved_by_id(*), photos:asset_issue_photos(*)"
       )
       .eq("asset_id", assetId)
       .order("created_at", { ascending: false }),
+    // This is the new query to get the activity log
+    supabase
+      .from("shift_report_assets")
+      .select(
+        "shift_report:shift_reports!inner(*, project:projects(id, name), created_by:profiles(first_name, last_name))"
+      )
+      .eq("asset_id", assetId)
+      .order("created_at", {
+        referencedTable: "shift_reports",
+        ascending: false,
+      }),
   ]);
 
   const initialIssues = (issuesResult.data || []).map((issue) => ({
@@ -84,9 +97,14 @@ export default async function AssetPage({ params }: AssetPageProps) {
       ? issue.resolver[0]
       : issue.resolver,
   }));
+  const initialActivityLog = (activityLogResult.data || []).map((log) => ({
+    ...log,
+    shift_report: Array.isArray(log.shift_report)
+      ? log.shift_report[0]
+      : log.shift_report,
+  }));
 
   return (
-    // The AssetDetailPage now handles all its own UI rendering
     <AssetDetailPage
       initialAsset={assetResult as Asset}
       teamMembers={(teamMembersResult.data as TeamMember[]) || []}
@@ -94,6 +112,7 @@ export default async function AssetPage({ params }: AssetPageProps) {
       availableAssets={availableAssetsResult.data || []}
       assetStatuses={statusesResult.data || []}
       initialIssues={initialIssues as AssetIssue[]}
+      initialActivityLog={initialActivityLog as AssetActivityLog[]}
       isCurrentUserAdmin={currentUserRole === "team_admin"}
       currentUserId={user.id}
     />
