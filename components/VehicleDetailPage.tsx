@@ -8,7 +8,9 @@ import {
   VehicleEvent,
   VehicleMileageLog,
   VehicleActivityLog,
+  ShiftReport,
 } from "@/lib/types";
+import ShiftReportDetailModal from "./ShiftReportDetailModal";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
 import {
@@ -71,6 +73,7 @@ export default function VehicleDetailPage({
   const [isAssigning, setIsAssigning] = useState(false);
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
+  const [viewingReport, setViewingReport] = useState<ShiftReport | null>(null);
   const [viewingNote, setViewingNote] = useState<string | null>(null);
 
   useEffect(() => {
@@ -109,6 +112,30 @@ export default function VehicleDetailPage({
     }
   };
 
+  const handleViewReportDetails = async (reportId: string) => {
+    const loadingToast = toast.loading("Loading report details...");
+    const { data, error } = await supabase
+      .from("shift_reports")
+      .select(
+        `*, 
+                project:projects(name), 
+                created_by:profiles(first_name, last_name),
+                personnel:shift_report_personnel(profiles(id, first_name, last_name)),
+                assets:shift_report_assets(assets(id, system_id, model)),
+                vehicles:shift_report_vehicles(vehicles(id, registration_number))
+            `
+      )
+      .eq("id", reportId)
+      .single();
+
+    toast.dismiss(loadingToast);
+    if (error || !data) {
+      toast.error("Could not load report details.");
+    } else {
+      setViewingReport(data as unknown as ShiftReport);
+    }
+  };
+
   const assigneeName =
     `${(vehicle as any).assignee_first_name || ""} ${(vehicle as any).assignee_last_name || ""}`.trim();
   const serviceDueDate =
@@ -139,6 +166,10 @@ export default function VehicleDetailPage({
         onSuccess={handleLogSuccess}
         vehicle={vehicle}
         userId={currentUserId}
+      />
+      <ShiftReportDetailModal
+        report={viewingReport}
+        onClose={() => setViewingReport(null)}
       />
 
       <Modal
@@ -476,12 +507,15 @@ export default function VehicleDetailPage({
                             {userName}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <Link
-                              href={`/dashboard/logs/${log.shift_report.id}`}
+                            <button
+                              onClick={() =>
+                                log.shift_report &&
+                                handleViewReportDetails(log.shift_report.id)
+                              }
                               className="text-indigo-600 hover:text-indigo-900"
                             >
                               View Report
-                            </Link>
+                            </button>
                           </td>
                         </tr>
                       );

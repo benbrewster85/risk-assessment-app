@@ -228,6 +228,7 @@ export type ShiftReport = {
         first_name: string | null;
         last_name: string | null;
     } | null;
+    log_type: string;
 };
 
 

@@ -8,9 +8,9 @@ const navLinks = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
   { name: "Projects", href: "/dashboard/projects", icon: Folder },
   { name: "Logs & Records", href: "/dashboard/logs", icon: FileText },
-  { name: "Asset Management", href: "/dashboard/assets", icon: HardDrive },
-  { name: "Vehicle Management", href: "/dashboard/vehicles", icon: Truck },
-  { name: "Team Management", href: "/dashboard/team", icon: Users },
+  { name: "Assets", href: "/dashboard/assets", icon: HardDrive },
+  { name: "Vehicles", href: "/dashboard/vehicles", icon: Truck },
+  { name: "My Team", href: "/dashboard/team", icon: Users },
 ];
 
 type SidebarProps = {
