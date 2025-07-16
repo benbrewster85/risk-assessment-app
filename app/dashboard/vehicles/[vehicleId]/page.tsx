@@ -5,6 +5,7 @@ import {
   TeamMember,
   VehicleEvent,
   VehicleMileageLog,
+  VehicleActivityLog,
 } from "@/lib/types";
 import VehicleDetailPage from "@/components/VehicleDetailPage";
 
@@ -28,6 +29,7 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
     .select("team_id, role")
     .eq("id", user.id)
     .single();
+
   if (!profile?.team_id) notFound();
   const teamId = profile.team_id;
   const isCurrentUserAdmin = profile.role === "team_admin";
@@ -38,29 +40,41 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
     .eq("id", vehicleId)
     .eq("team_id", teamId)
     .single();
+
   if (error || !vehicle) {
-    console.error("Error fetching vehicle:", error);
     notFound();
   }
 
-  const [teamMembersResult, eventsResult, mileageResult] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, first_name, last_name")
-      .eq("team_id", teamId),
-    supabase
-      .from("vehicle_events")
-      .select(
-        "*, reporter:profiles(*), resolver:profiles(*), attachments:vehicle_event_attachments(*)"
-      )
-      .eq("vehicle_id", vehicleId)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("vehicle_mileage_logs")
-      .select("*, user:profiles(first_name, last_name)")
-      .eq("vehicle_id", vehicleId)
-      .order("journey_date", { ascending: false }),
-  ]);
+  const [teamMembersResult, eventsResult, mileageResult, activityLogResult] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, first_name, last_name")
+        .eq("team_id", teamId),
+      supabase
+        .from("vehicle_events")
+        .select(
+          "*, reporter:profiles(*), resolver:profiles(*), attachments:vehicle_event_attachments(*)"
+        )
+        .eq("vehicle_id", vehicleId)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("vehicle_mileage_logs")
+        .select("*, user:profiles(first_name, last_name)")
+        .eq("vehicle_id", vehicleId)
+        .order("journey_date", { ascending: false }),
+      // This is the new query to fetch the activity log
+      supabase
+        .from("shift_report_vehicles")
+        .select(
+          "shift_report:shift_reports!inner(*, project:projects(id, name), created_by:profiles(first_name, last_name))"
+        )
+        .eq("vehicle_id", vehicleId)
+        .order("created_at", {
+          referencedTable: "shift_reports",
+          ascending: false,
+        }),
+    ]);
 
   const initialEvents = (eventsResult.data || []).map((event) => ({
     ...event,
@@ -77,12 +91,20 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
     user: Array.isArray(log.user) ? log.user[0] : log.user,
   }));
 
+  const initialActivityLog = (activityLogResult.data || []).map((log) => ({
+    ...log,
+    shift_report: Array.isArray(log.shift_report)
+      ? log.shift_report[0]
+      : log.shift_report,
+  }));
+
   return (
     <VehicleDetailPage
       initialVehicle={vehicle as Vehicle}
       teamMembers={(teamMembersResult.data as TeamMember[]) || []}
       initialEvents={initialEvents as VehicleEvent[]}
       initialMileageLogs={initialMileageLogs as VehicleMileageLog[]}
+      initialActivityLog={initialActivityLog as VehicleActivityLog[]}
       isCurrentUserAdmin={isCurrentUserAdmin}
       currentUserId={user.id}
     />

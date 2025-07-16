@@ -7,6 +7,7 @@ import {
   TeamMember,
   VehicleEvent,
   VehicleMileageLog,
+  VehicleActivityLog,
 } from "@/lib/types";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
@@ -29,6 +30,7 @@ type VehicleDetailPageProps = {
   teamMembers: TeamMember[];
   initialEvents: VehicleEvent[];
   initialMileageLogs: VehicleMileageLog[];
+  initialActivityLog: VehicleActivityLog[]; // New prop
   isCurrentUserAdmin: boolean;
   currentUserId: string;
 };
@@ -53,6 +55,7 @@ export default function VehicleDetailPage({
   teamMembers,
   initialEvents,
   initialMileageLogs,
+  initialActivityLog,
   isCurrentUserAdmin,
   currentUserId,
 }: VehicleDetailPageProps) {
@@ -61,6 +64,7 @@ export default function VehicleDetailPage({
   const [vehicle, setVehicle] = useState(initialVehicle);
   const [events, setEvents] = useState(initialEvents);
   const [mileageLogs, setMileageLogs] = useState(initialMileageLogs);
+  const [activityLog, setActivityLog] = useState(initialActivityLog); // New state
   const [selectedAssignee, setSelectedAssignee] = useState(
     initialVehicle.current_assignee_id || ""
   );
@@ -73,8 +77,9 @@ export default function VehicleDetailPage({
     setVehicle(initialVehicle);
     setEvents(initialEvents);
     setMileageLogs(initialMileageLogs);
+    setActivityLog(initialActivityLog);
     setSelectedAssignee(initialVehicle.current_assignee_id || "");
-  }, [initialVehicle, initialEvents, initialMileageLogs]);
+  }, [initialVehicle, initialEvents, initialMileageLogs, initialActivityLog]);
 
   const handleAssign = async () => {
     setIsAssigning(true);
@@ -155,7 +160,7 @@ export default function VehicleDetailPage({
       </Modal>
 
       <div className="p-8">
-        <div className="max-w-4xl mx-auto space-y-8">
+        <div className="max-w-7xl mx-auto space-y-8">
           <div className="text-sm">
             <Link
               href="/dashboard/vehicles"
@@ -424,6 +429,70 @@ export default function VehicleDetailPage({
                         className="text-center text-gray-500 py-8"
                       >
                         No mileage has been logged for this vehicle.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow p-8">
+            <h2 className="text-2xl font-bold mb-4">Activity Log</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                      Project
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                      Logged By
+                    </th>
+                    <th className="relative px-6 py-3">
+                      <span className="sr-only">View</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {initialActivityLog.length > 0 ? (
+                    initialActivityLog.map((log) => {
+                      if (!log.shift_report) return null;
+                      const userName =
+                        `${log.shift_report.created_by?.first_name || ""} ${log.shift_report.created_by?.last_name || ""}`.trim();
+                      return (
+                        <tr key={log.shift_report.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {new Date(
+                              log.shift_report.start_time
+                            ).toLocaleDateString("en-GB")}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {log.shift_report.project?.name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {userName}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <Link
+                              href={`/dashboard/logs/${log.shift_report.id}`}
+                              className="text-indigo-600 hover:text-indigo-900"
+                            >
+                              View Report
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="text-center text-gray-500 py-8"
+                      >
+                        This VEHICLE has not been used in any shift reports.
                       </td>
                     </tr>
                   )}
