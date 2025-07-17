@@ -17,6 +17,23 @@ export type DynamicRisk = { id: number; logged_at: string; risk_description: str
 export type ReportSignatory = { profiles: { first_name: string | null; last_name: string | null; role: string; id: string; } | null; };
 export type ReportSignature = { signed_at: string; profiles: { first_name: string | null; last_name: string | null; id: string; } | null; };
 
+export type ShiftReport = {
+    id: string;
+    created_at: string;
+    start_time: string;
+    end_time: string | null;
+    work_completed: string | null;
+    notes: string | null;
+    project: {
+        id: string;
+        name: string;
+    } | null;
+    created_by: {
+        first_name: string | null;
+        last_name: string | null;
+    } | null;
+};
+
 export type EventLog = {
     id: string;
     log_type: string;
@@ -37,3 +54,4 @@ export type AssetActivityLog = {
 export type VehicleActivityLog = {
     event_log: EventLog | null;
 };
+
