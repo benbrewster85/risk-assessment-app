@@ -10,7 +10,7 @@ import {
   Project,
   RiskAssessmentListItem,
   DynamicRisk,
-  ShiftReport,
+  EventLog,
 } from "@/lib/types";
 import DynamicRiskLog from "./DynamicRiskLog";
 import ProjectDetailsTab from "./ProjectDetailsTab";
@@ -33,7 +33,7 @@ type ProjectClientPageProps = {
   initialProject: Project;
   initialRiskAssessments: RiskAssessmentListItem[];
   initialDynamicRisks: DynamicRisk[];
-  initialShiftReports: ShiftReport[];
+  initialShiftReports: EventLog[];
   currentUserId: string;
   currentUserRole: string;
 };
@@ -80,7 +80,7 @@ export default function ProjectClientPage({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // New state for the shift report detail modal
-  const [viewingReport, setViewingReport] = useState<ShiftReport | null>(null);
+  const [viewingReport, setViewingReport] = useState<EventLog | null>(null);
 
   const isEditingRa = editingRa !== null;
   const isEditingDynamicRisk = editingDynamicRisk !== null;
@@ -264,13 +264,18 @@ export default function ProjectClientPage({
 
   const handleViewReportDetails = async (reportId: string) => {
     const loadingToast = toast.loading("Loading report details...");
+    // This is the new, more explicit and robust query
     const { data, error } = await supabase
-      .from("shift_reports")
+      .from("event_logs")
       .select(
-        `*, project:projects(name), created_by:profiles(first_name, last_name),
-                personnel:shift_report_personnel(profiles(id, first_name, last_name)),
-                assets:shift_report_assets(assets(id, system_id, model)),
-                vehicles:shift_report_vehicles(vehicles(id, registration_number, model))`
+        `
+                *,
+                project:projects(name),
+                created_by:profiles(first_name, last_name),
+                personnel:event_log_personnel!inner(profiles(id, first_name, last_name)),
+                assets:event_log_assets!inner(assets(id, system_id, model)),
+                vehicles:event_log_vehicles!inner(vehicles(id, registration_number, model))
+            `
       )
       .eq("id", reportId)
       .single();
@@ -278,8 +283,9 @@ export default function ProjectClientPage({
     toast.dismiss(loadingToast);
     if (error || !data) {
       toast.error("Could not load report details.");
+      console.error("Error fetching report details:", error);
     } else {
-      setViewingReport(data as unknown as ShiftReport);
+      setViewingReport(data as unknown as EventLog);
     }
   };
 

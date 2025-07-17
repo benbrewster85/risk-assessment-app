@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import {
-  ShiftReport,
+  EventLog,
   ProjectListItem,
   TeamMember,
   Asset,
@@ -39,7 +39,7 @@ export default async function LogsPage() {
     vehiclesResult,
   ] = await Promise.all([
     supabase
-      .from("shift_reports")
+      .from("event_logs")
       .select(
         "*, project:projects(id, name), created_by:profiles(first_name, last_name)"
       )
@@ -62,7 +62,7 @@ export default async function LogsPage() {
 
   return (
     <LogsListPage
-      initialReports={(reportsResult.data as ShiftReport[]) || []}
+      initialReports={(reportsResult.data as EventLog[]) || []}
       projects={(projectsResult.data as ProjectListItem[]) || []}
       teamMembers={(membersResult.data as TeamMember[]) || []}
       assets={(assetsResult.data as Asset[]) || []}

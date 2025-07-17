@@ -4,7 +4,7 @@ import {
   Project,
   RiskAssessmentListItem,
   DynamicRisk,
-  ShiftReport,
+  EventLog,
 } from "@/lib/types";
 import ProjectClientPage from "@/components/ProjectClientPage";
 
@@ -48,7 +48,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       .order("logged_at", { ascending: false }),
     // NEW: Fetch shift reports for this project
     supabase
-      .from("shift_reports")
+      .from("event_logs")
       .select(
         "*, created_by:profiles(first_name, last_name), project:projects(name)"
       )
@@ -68,7 +68,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       initialProject={project as Project}
       initialRiskAssessments={(raResult.data as RiskAssessmentListItem[]) || []}
       initialDynamicRisks={(dynamicRisksResult.data as DynamicRisk[]) || []}
-      initialShiftReports={(shiftReportsResult.data as ShiftReport[]) || []}
+      initialShiftReports={(shiftReportsResult.data as EventLog[]) || []}
       currentUserId={user.id}
       currentUserRole={currentUserRole}
     />

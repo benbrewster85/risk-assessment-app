@@ -8,9 +8,8 @@ import {
   VehicleEvent,
   VehicleMileageLog,
   VehicleActivityLog,
-  ShiftReport,
+  EventLog,
 } from "@/lib/types";
-import ShiftReportDetailModal from "./ShiftReportDetailModal";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
 import {
@@ -20,19 +19,24 @@ import {
   Tool,
   FileText,
   Eye,
+  XCircle,
+  Link2,
+  Printer,
 } from "react-feather";
 import { useRouter } from "next/navigation";
 import LogVehicleIssueModal from "./LogVehicleIssueModal";
 import LogVehicleServiceModal from "./LogVehicleServiceModal";
 import StorageImage from "./StorageImage";
 import Modal from "./Modal";
+import ShiftReportDetailModal from "./ShiftReportDetailModal";
+import ResolveVehicleIssueModal from "./ResolveVehicleIssueModal";
 
 type VehicleDetailPageProps = {
   initialVehicle: Vehicle;
   teamMembers: TeamMember[];
   initialEvents: VehicleEvent[];
   initialMileageLogs: VehicleMileageLog[];
-  initialActivityLog: VehicleActivityLog[]; // New prop
+  initialActivityLog: VehicleActivityLog[];
   isCurrentUserAdmin: boolean;
   currentUserId: string;
 };
@@ -66,15 +70,18 @@ export default function VehicleDetailPage({
   const [vehicle, setVehicle] = useState(initialVehicle);
   const [events, setEvents] = useState(initialEvents);
   const [mileageLogs, setMileageLogs] = useState(initialMileageLogs);
-  const [activityLog, setActivityLog] = useState(initialActivityLog); // New state
+  const [activityLog, setActivityLog] = useState(initialActivityLog);
   const [selectedAssignee, setSelectedAssignee] = useState(
     initialVehicle.current_assignee_id || ""
   );
   const [isAssigning, setIsAssigning] = useState(false);
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
-  const [viewingReport, setViewingReport] = useState<ShiftReport | null>(null);
   const [viewingNote, setViewingNote] = useState<string | null>(null);
+  const [viewingReport, setViewingReport] = useState<EventLog | null>(null);
+  const [resolvingEvent, setResolvingEvent] = useState<VehicleEvent | null>(
+    null
+  );
 
   useEffect(() => {
     setVehicle(initialVehicle);
@@ -90,7 +97,6 @@ export default function VehicleDetailPage({
       .from("vehicles")
       .update({ current_assignee_id: selectedAssignee || null })
       .eq("id", vehicle.id);
-
     if (error) {
       toast.error(`Failed to assign vehicle: ${error.message}`);
     } else {
@@ -101,28 +107,30 @@ export default function VehicleDetailPage({
   };
 
   const handleLogSuccess = (newEvent: VehicleEvent) => {
-    setEvents((prev) =>
-      [newEvent, ...prev].sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    router.refresh();
+  };
+
+  const handleIssueResolved = (updatedEvent: VehicleEvent) => {
+    setEvents(
+      events.map((event) =>
+        event.id === updatedEvent.id ? updatedEvent : event
       )
     );
-    if (newEvent.log_type === "Service" || newEvent.log_type === "MOT") {
-      router.refresh();
-    }
   };
 
   const handleViewReportDetails = async (reportId: string) => {
     const loadingToast = toast.loading("Loading report details...");
+    // This new query is explicit and matches the working version from the Asset page
     const { data, error } = await supabase
-      .from("shift_reports")
+      .from("event_logs")
       .select(
-        `*, 
-                project:projects(name), 
+        `
+                *,
+                project:projects(name),
                 created_by:profiles(first_name, last_name),
-                personnel:shift_report_personnel(profiles(id, first_name, last_name)),
-                assets:shift_report_assets(assets(id, system_id, model)),
-                vehicles:shift_report_vehicles(vehicles(id, registration_number))
+                personnel:event_log_personnel(profiles(id, first_name, last_name)),
+                assets:event_log_assets(assets(id, system_id, model)),
+                vehicles:event_log_vehicles(vehicles(id, registration_number))
             `
       )
       .eq("id", reportId)
@@ -131,8 +139,9 @@ export default function VehicleDetailPage({
     toast.dismiss(loadingToast);
     if (error || !data) {
       toast.error("Could not load report details.");
+      console.error("Error fetching report details:", error);
     } else {
-      setViewingReport(data as unknown as ShiftReport);
+      setViewingReport(data as unknown as EventLog);
     }
   };
 
@@ -147,7 +156,6 @@ export default function VehicleDetailPage({
           )
         )
       : null;
-
   const serviceStatus = getStatus(serviceDueDate?.toISOString() || null);
   const motStatus = getStatus(vehicle.mot_due_date);
 
@@ -167,11 +175,12 @@ export default function VehicleDetailPage({
         vehicle={vehicle}
         userId={currentUserId}
       />
-      <ShiftReportDetailModal
-        report={viewingReport}
-        onClose={() => setViewingReport(null)}
+      <ResolveVehicleIssueModal
+        isOpen={resolvingEvent !== null}
+        onClose={() => setResolvingEvent(null)}
+        onSuccess={handleIssueResolved}
+        event={resolvingEvent}
       />
-
       <Modal
         title="Journey Note"
         isOpen={viewingNote !== null}
@@ -189,6 +198,10 @@ export default function VehicleDetailPage({
           </button>
         </div>
       </Modal>
+      <ShiftReportDetailModal
+        report={viewingReport}
+        onClose={() => setViewingReport(null)}
+      />
 
       <div className="p-8">
         <div className="max-w-7xl mx-auto space-y-8">
@@ -313,6 +326,8 @@ export default function VehicleDetailPage({
                     "System";
                   const resolverName =
                     `${event.resolver?.first_name || ""} ${event.resolver?.last_name || ""}`.trim();
+                  const canResolve =
+                    isCurrentUserAdmin || (vehicle as any).is_fleet_manager;
                   return (
                     <div
                       key={event.id}
@@ -374,11 +389,14 @@ export default function VehicleDetailPage({
                           </p>
                         </div>
                       )}
-                      {isCurrentUserAdmin &&
+                      {canResolve &&
                         event.status === "Open" &&
                         event.log_type === "Issue" && (
                           <div className="mt-3 text-right">
-                            <button className="flex items-center text-xs font-medium text-white bg-green-600 hover:bg-green-700 px-2 py-1 rounded-md ml-auto">
+                            <button
+                              onClick={() => setResolvingEvent(event)}
+                              className="flex items-center text-xs font-medium text-white bg-green-600 hover:bg-green-700 px-2 py-1 rounded-md ml-auto"
+                            >
                               <Tool className="h-3 w-3 mr-1" />
                               Resolve Issue
                             </button>
@@ -467,6 +485,7 @@ export default function VehicleDetailPage({
               </table>
             </div>
           </div>
+
           <div className="bg-white rounded-lg shadow p-8">
             <h2 className="text-2xl font-bold mb-4">Activity Log</h2>
             <div className="overflow-x-auto">
@@ -488,45 +507,43 @@ export default function VehicleDetailPage({
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {initialActivityLog.length > 0 ? (
-                    initialActivityLog.map((log) => {
-                      if (!log.shift_report) return null;
-                      const userName =
-                        `${log.shift_report.created_by?.first_name || ""} ${log.shift_report.created_by?.last_name || ""}`.trim();
-                      return (
-                        <tr key={log.shift_report.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {new Date(
-                              log.shift_report.start_time
-                            ).toLocaleDateString("en-GB")}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {log.shift_report.project?.name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {userName}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button
-                              onClick={() =>
-                                log.shift_report &&
-                                handleViewReportDetails(log.shift_report.id)
-                              }
-                              className="text-indigo-600 hover:text-indigo-900"
-                            >
-                              View Report
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
+                  {activityLog.map((log) => {
+                    if (!log.event_log) return null;
+                    const userName =
+                      `${log.event_log.created_by?.first_name || ""} ${log.event_log.created_by?.last_name || ""}`.trim();
+                    return (
+                      <tr key={log.event_log.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {new Date(
+                            log.event_log.start_time
+                          ).toLocaleDateString("en-GB")}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {log.event_log.project?.name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {userName}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() =>
+                              handleViewReportDetails(log.event_log!.id)
+                            }
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            View Report
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {activityLog.length === 0 && (
                     <tr>
                       <td
                         colSpan={4}
                         className="text-center text-gray-500 py-8"
                       >
-                        This VEHICLE has not been used in any shift reports.
+                        This vehicle has not been used in any shift reports.
                       </td>
                     </tr>
                   )}

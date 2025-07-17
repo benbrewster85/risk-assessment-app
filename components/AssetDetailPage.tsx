@@ -7,7 +7,7 @@ import {
   TeamMember,
   AssetIssue,
   AssetActivityLog,
-  ShiftReport,
+  EventLog,
 } from "@/lib/types";
 import ShiftReportDetailModal from "./ShiftReportDetailModal";
 import { toast } from "react-hot-toast";
@@ -72,7 +72,7 @@ export default function AssetDetailPage({
   const [isLogMaintenanceModalOpen, setIsLogMaintenanceModalOpen] =
     useState(false);
   const [resolvingIssue, setResolvingIssue] = useState<AssetIssue | null>(null);
-  const [viewingReport, setViewingReport] = useState<ShiftReport | null>(null);
+  const [viewingReport, setViewingReport] = useState<EventLog | null>(null);
 
   useEffect(() => {
     setAsset(initialAsset);
@@ -161,15 +161,17 @@ export default function AssetDetailPage({
 
   const handleViewReportDetails = async (reportId: string) => {
     const loadingToast = toast.loading("Loading report details...");
+    // This is the new, more explicit and robust query
     const { data, error } = await supabase
-      .from("shift_reports")
+      .from("event_logs")
       .select(
-        `*, 
-                project:projects(name), 
+        `
+                *,
+                project:projects(name),
                 created_by:profiles(first_name, last_name),
-                personnel:shift_report_personnel(profiles(id, first_name, last_name)),
-                assets:shift_report_assets(assets(id, system_id, model)),
-                vehicles:shift_report_vehicles(vehicles(id, registration_number))
+                personnel:event_log_personnel!inner(profiles(id, first_name, last_name)),
+                assets:event_log_assets!inner(assets(id, system_id, model)),
+                vehicles:event_log_vehicles!inner(vehicles(id, registration_number, model))
             `
       )
       .eq("id", reportId)
@@ -178,8 +180,9 @@ export default function AssetDetailPage({
     toast.dismiss(loadingToast);
     if (error || !data) {
       toast.error("Could not load report details.");
+      console.error("Error fetching report details:", error);
     } else {
-      setViewingReport(data as unknown as ShiftReport);
+      setViewingReport(data as unknown as EventLog);
     }
   };
 
@@ -634,18 +637,18 @@ export default function AssetDetailPage({
                 <tbody className="bg-white divide-y divide-gray-200">
                   {initialActivityLog.length > 0 ? (
                     initialActivityLog.map((log) => {
-                      if (!log.shift_report) return null;
+                      if (!log.event_log) return null;
                       const userName =
-                        `${log.shift_report.created_by?.first_name || ""} ${log.shift_report.created_by?.last_name || ""}`.trim();
+                        `${log.event_log.created_by?.first_name || ""} ${log.event_log.created_by?.last_name || ""}`.trim();
                       return (
-                        <tr key={log.shift_report.id}>
+                        <tr key={log.event_log.id}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             {new Date(
-                              log.shift_report.start_time
+                              log.event_log.start_time
                             ).toLocaleDateString("en-GB")}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {log.shift_report.project?.name}
+                            {log.event_log.project?.name}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             {userName}
@@ -653,8 +656,8 @@ export default function AssetDetailPage({
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <button
                               onClick={() =>
-                                log.shift_report &&
-                                handleViewReportDetails(log.shift_report.id)
+                                log.event_log &&
+                                handleViewReportDetails(log.event_log.id)
                               }
                               className="text-indigo-600 hover:text-indigo-900"
                             >

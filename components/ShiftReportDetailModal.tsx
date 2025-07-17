@@ -1,23 +1,16 @@
 "use client";
 
-import { ShiftReport } from "@/lib/types";
+import { EventLog } from "@/lib/types";
 import Modal from "./Modal";
-import Link from "next/link";
 
 type ShiftReportDetailModalProps = {
-  report: ShiftReport | null;
+  report: EventLog | null;
   onClose: () => void;
 };
 
-const LinkedItem = ({
-  item,
-  type,
-}: {
-  item: { id: string; name: string | null };
-  type: "asset" | "vehicle" | "user";
-}) => (
+const LinkedItem = ({ name }: { name: string | null }) => (
   <span className="inline-block bg-blue-100 text-blue-800 text-xs font-medium mr-2 mb-2 px-2.5 py-0.5 rounded-full">
-    {item.name}
+    {name}
   </span>
 );
 
@@ -35,6 +28,7 @@ export default function ShiftReportDetailModal({
     });
   };
 
+  // Safely access the nested data
   const personnel = (report as any).personnel || [];
   const assets = (report as any).assets || [];
   const vehicles = (report as any).vehicles || [];
@@ -81,11 +75,7 @@ export default function ShiftReportDetailModal({
               {personnel.map((p: any) => (
                 <LinkedItem
                   key={p.profiles.id}
-                  item={{
-                    id: p.profiles.id,
-                    name: `${p.profiles.first_name} ${p.profiles.last_name}`,
-                  }}
-                  type="user"
+                  name={`${p.profiles.first_name} ${p.profiles.last_name}`}
                 />
               )) || "N/A"}
             </dd>
@@ -103,11 +93,7 @@ export default function ShiftReportDetailModal({
                 ? assets.map((a: any) => (
                     <LinkedItem
                       key={a.assets.id}
-                      item={{
-                        id: a.assets.id,
-                        name: `${a.assets.system_id} (${a.assets.model})`,
-                      }}
-                      type="asset"
+                      name={`${a.assets.system_id} (${a.assets.model})`}
                     />
                   ))
                 : "None"}
@@ -120,11 +106,7 @@ export default function ShiftReportDetailModal({
                 ? vehicles.map((v: any) => (
                     <LinkedItem
                       key={v.vehicles.id}
-                      item={{
-                        id: v.vehicles.id,
-                        name: `${v.vehicles.registration_number}`,
-                      }}
-                      type="vehicle"
+                      name={`${v.vehicles.registration_number}`}
                     />
                   ))
                 : "None"}

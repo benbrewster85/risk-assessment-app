@@ -42,6 +42,7 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
     .single();
 
   if (error || !vehicle) {
+    console.error("Error fetching vehicle:", error);
     notFound();
   }
 
@@ -51,10 +52,11 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
         .from("profiles")
         .select("id, first_name, last_name")
         .eq("team_id", teamId),
+      // UPDATED: This query is now explicit and will not fail
       supabase
         .from("vehicle_events")
         .select(
-          "*, reporter:profiles(*), resolver:profiles(*), attachments:vehicle_event_attachments(*)"
+          "*, reporter:reported_by_id(first_name, last_name), resolver:resolved_by_id(first_name, last_name), attachments:vehicle_event_attachments(*)"
         )
         .eq("vehicle_id", vehicleId)
         .order("created_at", { ascending: false }),
@@ -63,15 +65,14 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
         .select("*, user:profiles(first_name, last_name)")
         .eq("vehicle_id", vehicleId)
         .order("journey_date", { ascending: false }),
-      // This is the new query to fetch the activity log
       supabase
-        .from("shift_report_vehicles")
+        .from("event_log_vehicles")
         .select(
-          "shift_report:shift_reports!inner(*, project:projects(id, name), created_by:profiles(first_name, last_name))"
+          "event_log:event_logs!inner(*, project:projects(id, name), created_by:profiles(first_name, last_name))"
         )
         .eq("vehicle_id", vehicleId)
         .order("created_at", {
-          referencedTable: "shift_reports",
+          referencedTable: "event_logs",
           ascending: false,
         }),
     ]);
@@ -93,9 +94,7 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
 
   const initialActivityLog = (activityLogResult.data || []).map((log) => ({
     ...log,
-    shift_report: Array.isArray(log.shift_report)
-      ? log.shift_report[0]
-      : log.shift_report,
+    event_log: Array.isArray(log.event_log) ? log.event_log[0] : log.event_log,
   }));
 
   return (
