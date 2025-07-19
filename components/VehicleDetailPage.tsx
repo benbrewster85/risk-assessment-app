@@ -19,17 +19,14 @@ import {
   Tool,
   FileText,
   Eye,
-  XCircle,
-  Link2,
-  Printer,
 } from "react-feather";
 import { useRouter } from "next/navigation";
 import LogVehicleIssueModal from "./LogVehicleIssueModal";
 import LogVehicleServiceModal from "./LogVehicleServiceModal";
+import ResolveVehicleIssueModal from "./ResolveVehicleIssueModal";
 import StorageImage from "./StorageImage";
 import Modal from "./Modal";
-import ShiftReportDetailModal from "./ShiftReportDetailModal";
-import ResolveVehicleIssueModal from "./ResolveVehicleIssueModal";
+import ViewReportModal from "./ViewReportModal";
 
 type VehicleDetailPageProps = {
   initialVehicle: Vehicle;
@@ -48,7 +45,6 @@ const getStatus = (dueDate: string | null) => {
   today.setHours(0, 0, 0, 0);
   const thirtyDaysFromNow = new Date();
   thirtyDaysFromNow.setDate(today.getDate() + 30);
-
   if (due < today)
     return { text: "Overdue", Icon: AlertTriangle, color: "text-red-600" };
   if (due < thirtyDaysFromNow)
@@ -78,10 +74,10 @@ export default function VehicleDetailPage({
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
   const [viewingNote, setViewingNote] = useState<string | null>(null);
-  const [viewingReport, setViewingReport] = useState<EventLog | null>(null);
   const [resolvingEvent, setResolvingEvent] = useState<VehicleEvent | null>(
     null
   );
+  const [viewingReportId, setViewingReportId] = useState<string | null>(null);
 
   useEffect(() => {
     setVehicle(initialVehicle);
@@ -116,33 +112,6 @@ export default function VehicleDetailPage({
         event.id === updatedEvent.id ? updatedEvent : event
       )
     );
-  };
-
-  const handleViewReportDetails = async (reportId: string) => {
-    const loadingToast = toast.loading("Loading report details...");
-    // This new query is explicit and matches the working version from the Asset page
-    const { data, error } = await supabase
-      .from("event_logs")
-      .select(
-        `
-                *,
-                project:projects(name),
-                created_by:profiles(first_name, last_name),
-                personnel:event_log_personnel(profiles(id, first_name, last_name)),
-                assets:event_log_assets(assets(id, system_id, model)),
-                vehicles:event_log_vehicles(vehicles(id, registration_number))
-            `
-      )
-      .eq("id", reportId)
-      .single();
-
-    toast.dismiss(loadingToast);
-    if (error || !data) {
-      toast.error("Could not load report details.");
-      console.error("Error fetching report details:", error);
-    } else {
-      setViewingReport(data as unknown as EventLog);
-    }
   };
 
   const assigneeName =
@@ -198,9 +167,9 @@ export default function VehicleDetailPage({
           </button>
         </div>
       </Modal>
-      <ShiftReportDetailModal
-        report={viewingReport}
-        onClose={() => setViewingReport(null)}
+      <ViewReportModal
+        reportId={viewingReportId}
+        onClose={() => setViewingReportId(null)}
       />
 
       <div className="p-8">
@@ -527,7 +496,7 @@ export default function VehicleDetailPage({
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
                             onClick={() =>
-                              handleViewReportDetails(log.event_log!.id)
+                              setViewingReportId(log.event_log!.id)
                             }
                             className="text-indigo-600 hover:text-indigo-900"
                           >

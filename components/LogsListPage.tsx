@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   EventLog,
   ProjectListItem,
@@ -14,10 +13,12 @@ import CreateReportSelectorModal, {
   ReportType,
 } from "./CreateReportSelectorModal";
 import LogShiftReportModal from "./LogShiftReportModal";
-import ShiftReportDetailModal from "./ShiftReportDetailModal";
+import LogLostShiftReportModal from "./LogLostShiftReportModal";
+import LogIncidentReportModal from "./LogIncidentReportModal";
+import ViewReportModal from "./ViewReportModal"; // Import our new master modal
 import { Plus, ChevronLeft, ChevronRight } from "react-feather";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-hot-toast";
+import { createClient } from "@/lib/supabase/client";
 
 type LogsListPageProps = {
   initialReports: EventLog[];
@@ -45,7 +46,11 @@ export default function LogsListPage({
   const [reports, setReports] = useState(initialReports);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [isShiftReportModalOpen, setIsShiftReportModalOpen] = useState(false);
-  const [viewingReport, setViewingReport] = useState<EventLog | null>(null);
+  const [isLostShiftModalOpen, setIsLostShiftModalOpen] = useState(false);
+  const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
+
+  // This state now just holds the ID of the report we want to view
+  const [viewingReportId, setViewingReportId] = useState<string | null>(null);
 
   const [projectFilter, setProjectFilter] = useState("");
   const [userFilter, setUserFilter] = useState("");
@@ -61,35 +66,13 @@ export default function LogsListPage({
     setIsSelectorOpen(false);
     if (reportType === "Shift Report") {
       setIsShiftReportModalOpen(true);
+    } else if (reportType === "Lost Shift Report") {
+      setIsLostShiftModalOpen(true);
+    } else if (reportType === "Incident Report") {
+      // Add this 'else if' block
+      setIsIncidentModalOpen(true);
     } else {
       toast.error(`${reportType} form not implemented yet.`);
-    }
-  };
-
-  const handleViewReportDetails = async (reportId: string) => {
-    const loadingToast = toast.loading("Loading report details...");
-    // This is the new, more explicit and robust query
-    const { data, error } = await supabase
-      .from("event_logs")
-      .select(
-        `
-                *,
-                project:projects(name),
-                created_by:profiles(first_name, last_name),
-                personnel:event_log_personnel!inner(profiles(id, first_name, last_name)),
-                assets:event_log_assets!inner(assets(id, system_id, model)),
-                vehicles:event_log_vehicles!inner(vehicles(id, registration_number, model))
-            `
-      )
-      .eq("id", reportId)
-      .single();
-
-    toast.dismiss(loadingToast);
-    if (error || !data) {
-      toast.error("Could not load report details.");
-      console.error("Error fetching report details:", error);
-    } else {
-      setViewingReport(data as unknown as EventLog);
     }
   };
 
@@ -132,9 +115,26 @@ export default function LogsListPage({
         assets={assets}
         vehicles={vehicles}
       />
-      <ShiftReportDetailModal
-        report={viewingReport}
-        onClose={() => setViewingReport(null)}
+      <LogLostShiftReportModal
+        isOpen={isLostShiftModalOpen}
+        onClose={() => setIsLostShiftModalOpen(false)}
+        onSuccess={() => router.refresh()}
+        teamId={teamId}
+        userId={userId}
+        projects={projects}
+        teamMembers={teamMembers}
+      />
+      <LogIncidentReportModal
+        isOpen={isIncidentModalOpen}
+        onClose={() => setIsIncidentModalOpen(false)}
+        onSuccess={() => router.refresh()}
+        teamId={teamId}
+        userId={userId}
+        projects={projects}
+      />
+      <ViewReportModal
+        reportId={viewingReportId}
+        onClose={() => setViewingReportId(null)}
       />
 
       <div className="p-8">
@@ -268,7 +268,7 @@ export default function LogsListPage({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
-                        onClick={() => handleViewReportDetails(report.id)}
+                        onClick={() => setViewingReportId(report.id)}
                         className="text-indigo-600 hover:text-indigo-900"
                       >
                         View Details

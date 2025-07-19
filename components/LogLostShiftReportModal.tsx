@@ -4,9 +4,8 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-hot-toast";
 import Modal from "./Modal";
-// import FormField from "./FormField";
 import FormField from "./FormField";
-import { ProjectListItem, TeamMember, EventLog } from "@/lib/types";
+import { ProjectListItem, TeamMember } from "@/lib/types";
 
 type LogLostShiftReportModalProps = {
   isOpen: boolean;
@@ -52,19 +51,18 @@ export default function LogLostShiftReportModal({
     setIsSubmitting(true);
 
     try {
-      // Note we are inserting into the generic 'event_logs' table
       const { error } = await supabase.from("event_logs").insert({
         team_id: teamId,
         project_id: projectId,
         created_by_id: userId,
         log_type: "Lost Shift Report",
-        // We use the JSON `log_data` field for the unique data
+        // For a lost shift, start_time can represent the date it was meant to happen
+        start_time: new Date(shiftDate).toISOString(),
+        // All unique data goes into the flexible log_data field
         log_data: {
           reason_for_loss: reason,
           personnel_ids: personnel,
         },
-        // We can use start_time to represent the date of the lost shift
-        start_time: new Date(shiftDate).toISOString(),
       });
 
       if (error) throw error;

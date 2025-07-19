@@ -9,7 +9,6 @@ import {
   AssetActivityLog,
   EventLog,
 } from "@/lib/types";
-import ShiftReportDetailModal from "./ShiftReportDetailModal";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
 import {
@@ -29,6 +28,7 @@ import LogMaintenanceModal from "./LogMaintenanceModal";
 import ResolveIssueModal from "./ResolveIssueModal";
 import StorageImage from "./StorageImage";
 import AssetQrCode from "./AssetQrCode";
+import ViewReportModal from "./ViewReportModal"; // CORRECT: Imports the new master modal
 
 type ChildAsset = { id: string; system_id: string; model: string | null };
 type Status = { id: string; name: string };
@@ -63,7 +63,7 @@ export default function AssetDetailPage({
   const [issues, setIssues] = useState(initialIssues);
   const [activityLog, setActivityLog] = useState(initialActivityLog);
   const [selectedAssignee, setSelectedAssignee] = useState(
-    asset.current_assignee_id || ""
+    initialAsset.current_assignee_id || ""
   );
   const [isAssigning, setIsAssigning] = useState(false);
   const [selectedChildId, setSelectedChildId] = useState("");
@@ -72,7 +72,7 @@ export default function AssetDetailPage({
   const [isLogMaintenanceModalOpen, setIsLogMaintenanceModalOpen] =
     useState(false);
   const [resolvingIssue, setResolvingIssue] = useState<AssetIssue | null>(null);
-  const [viewingReport, setViewingReport] = useState<EventLog | null>(null);
+  const [viewingReportId, setViewingReportId] = useState<string | null>(null); // CORRECT: State holds the ID
 
   useEffect(() => {
     setAsset(initialAsset);
@@ -159,33 +159,6 @@ export default function AssetDetailPage({
     );
   };
 
-  const handleViewReportDetails = async (reportId: string) => {
-    const loadingToast = toast.loading("Loading report details...");
-    // This is the new, more explicit and robust query
-    const { data, error } = await supabase
-      .from("event_logs")
-      .select(
-        `
-                *,
-                project:projects(name),
-                created_by:profiles(first_name, last_name),
-                personnel:event_log_personnel!inner(profiles(id, first_name, last_name)),
-                assets:event_log_assets!inner(assets(id, system_id, model)),
-                vehicles:event_log_vehicles!inner(vehicles(id, registration_number, model))
-            `
-      )
-      .eq("id", reportId)
-      .single();
-
-    toast.dismiss(loadingToast);
-    if (error || !data) {
-      toast.error("Could not load report details.");
-      console.error("Error fetching report details:", error);
-    } else {
-      setViewingReport(data as unknown as EventLog);
-    }
-  };
-
   const currentAssigneeName =
     `${asset.assignee_first_name || ""} ${asset.assignee_last_name || ""}`.trim();
 
@@ -245,9 +218,9 @@ export default function AssetDetailPage({
         onSuccess={handleIssueResolved}
         issue={resolvingIssue}
       />
-      <ShiftReportDetailModal
-        report={viewingReport}
-        onClose={() => setViewingReport(null)}
+      <ViewReportModal
+        reportId={viewingReportId}
+        onClose={() => setViewingReportId(null)}
       />
 
       <div className="p-4 md:p-8">
@@ -635,39 +608,37 @@ export default function AssetDetailPage({
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {initialActivityLog.length > 0 ? (
-                    initialActivityLog.map((log) => {
-                      if (!log.event_log) return null;
-                      const userName =
-                        `${log.event_log.created_by?.first_name || ""} ${log.event_log.created_by?.last_name || ""}`.trim();
-                      return (
-                        <tr key={log.event_log.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {new Date(
-                              log.event_log.start_time
-                            ).toLocaleDateString("en-GB")}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {log.event_log.project?.name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {userName}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button
-                              onClick={() =>
-                                log.event_log &&
-                                handleViewReportDetails(log.event_log.id)
-                              }
-                              className="text-indigo-600 hover:text-indigo-900"
-                            >
-                              View Report
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
+                  {activityLog.map((log) => {
+                    if (!log.event_log) return null;
+                    const userName =
+                      `${log.event_log.created_by?.first_name || ""} ${log.event_log.created_by?.last_name || ""}`.trim();
+                    return (
+                      <tr key={log.event_log.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {new Date(
+                            log.event_log.start_time
+                          ).toLocaleDateString("en-GB")}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {log.event_log.project?.name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {userName}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() =>
+                              setViewingReportId(log.event_log!.id)
+                            }
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            View Report
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {activityLog.length === 0 && (
                     <tr>
                       <td
                         colSpan={4}
