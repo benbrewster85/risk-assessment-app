@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   EventLog,
   ProjectListItem,
@@ -78,14 +77,14 @@ export default function LogsListPage({
       end_date_param: endDateFilter || null,
       log_type_param: logTypeFilter || null,
     });
+    setIsLoading(false);
 
     if (error) {
-      toast.error("Failed to fetch reports.");
+      toast.error("Failed to fetch filtered reports.");
       console.error(error);
     } else {
       setReports(data as EventLog[]);
     }
-    setIsLoading(false);
   }, [
     supabase,
     teamId,
@@ -96,15 +95,28 @@ export default function LogsListPage({
     logTypeFilter,
   ]);
 
+  // This effect runs whenever a filter value changes
   useEffect(() => {
-    fetchFilteredReports();
-    setCurrentPage(1); // Reset to first page on filter change
+    const hasFilters =
+      projectFilter ||
+      userFilter ||
+      startDateFilter ||
+      endDateFilter ||
+      logTypeFilter;
+    if (hasFilters) {
+      fetchFilteredReports();
+    } else {
+      setReports(initialReports);
+    }
+    setCurrentPage(1);
   }, [
     projectFilter,
     userFilter,
     startDateFilter,
     endDateFilter,
     logTypeFilter,
+    initialReports,
+    fetchFilteredReports,
   ]);
 
   const paginatedReports = useMemo(() => {

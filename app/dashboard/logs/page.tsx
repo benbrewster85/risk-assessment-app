@@ -30,7 +30,6 @@ export default async function LogsPage() {
   }
   const teamId = profile.team_id;
 
-  // Fetch all the data needed for the "Create" modal dropdowns
   const [
     reportsResult,
     projectsResult,
@@ -41,11 +40,15 @@ export default async function LogsPage() {
     supabase
       .from("event_logs")
       .select(
-        "*, project:projects(id, name), created_by:profiles(first_name, last_name)"
+        "*, project:projects(id, name), created_by:profiles(id, first_name, last_name)"
       )
       .eq("team_id", teamId)
-      .order("created_at", { ascending: false }),
-    supabase.from("projects").select("id, name").eq("team_id", teamId),
+      .order("start_time", { ascending: false }),
+    supabase
+      .from("projects")
+      .select("id, name")
+      .eq("team_id", teamId)
+      .order("name"),
     supabase
       .from("profiles")
       .select("id, first_name, last_name")
@@ -60,9 +63,18 @@ export default async function LogsPage() {
       .eq("team_id", teamId),
   ]);
 
+  // This new block of code processes the raw data from Supabase
+  const initialReports = (reportsResult.data || []).map((report) => ({
+    ...report,
+    project: Array.isArray(report.project) ? report.project[0] : report.project,
+    created_by: Array.isArray(report.created_by)
+      ? report.created_by[0]
+      : report.created_by,
+  }));
+
   return (
     <LogsListPage
-      initialReports={(reportsResult.data as EventLog[]) || []}
+      initialReports={initialReports as EventLog[]}
       projects={(projectsResult.data as ProjectListItem[]) || []}
       teamMembers={(membersResult.data as TeamMember[]) || []}
       assets={(assetsResult.data as Asset[]) || []}
