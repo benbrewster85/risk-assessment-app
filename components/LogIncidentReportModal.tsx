@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-hot-toast";
 import Modal from "./Modal";
 import FormField from "./FormField";
-import { ProjectListItem } from "@/lib/types";
+import { ProjectListItem, TeamMember } from "@/lib/types";
 
 type LogIncidentReportModalProps = {
   isOpen: boolean;
@@ -14,6 +14,7 @@ type LogIncidentReportModalProps = {
   teamId: string;
   userId: string;
   projects: ProjectListItem[];
+  teamMembers: TeamMember[];
 };
 
 const severityLevels = [

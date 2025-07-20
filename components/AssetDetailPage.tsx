@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   Asset,
@@ -20,6 +20,8 @@ import {
   FileText,
   Tool,
   Printer,
+  ChevronLeft,
+  ChevronRight,
 } from "react-feather";
 import { useRouter } from "next/navigation";
 import StatusBadge from "./StatusBadge";
@@ -72,6 +74,9 @@ export default function AssetDetailPage({
   const [isLogMaintenanceModalOpen, setIsLogMaintenanceModalOpen] =
     useState(false);
   const [resolvingIssue, setResolvingIssue] = useState<AssetIssue | null>(null);
+  const ITEMS_PER_PAGE = 10;
+  const [issuesPage, setIssuesPage] = useState(1);
+  const [activityLogPage, setActivityLogPage] = useState(1);
   const [viewingReportId, setViewingReportId] = useState<string | null>(null); // CORRECT: State holds the ID
 
   useEffect(() => {
@@ -158,6 +163,19 @@ export default function AssetDetailPage({
       )
     );
   };
+
+  const paginatedIssues = useMemo(() => {
+    const startIndex = (issuesPage - 1) * ITEMS_PER_PAGE;
+    return issues.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [issues, issuesPage]);
+
+  const paginatedActivityLog = useMemo(() => {
+    const startIndex = (activityLogPage - 1) * ITEMS_PER_PAGE;
+    return activityLog.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [activityLog, activityLogPage]);
+
+  const totalIssuePages = Math.ceil(issues.length / ITEMS_PER_PAGE);
+  const totalActivityLogPages = Math.ceil(activityLog.length / ITEMS_PER_PAGE);
 
   const currentAssigneeName =
     `${asset.assignee_first_name || ""} ${asset.assignee_last_name || ""}`.trim();
@@ -494,7 +512,7 @@ export default function AssetDetailPage({
             </div>
             <div className="space-y-6">
               {issues.length > 0 ? (
-                issues.map((issue) => {
+                paginatedIssues.map((issue) => {
                   const reporterName =
                     `${issue.reporter?.first_name || ""} ${issue.reporter?.last_name || ""}`.trim() ||
                     "System";
@@ -585,6 +603,28 @@ export default function AssetDetailPage({
                 </p>
               )}
             </div>
+
+            {issues.length > ITEMS_PER_PAGE && (
+              <div className="mt-6 flex justify-between items-center text-sm">
+                <button
+                  onClick={() => setIssuesPage((p) => p - 1)}
+                  disabled={issuesPage === 1}
+                  className="flex items-center px-3 py-1 border rounded-md disabled:opacity-50"
+                >
+                  <ChevronLeft size={16} className="mr-1" /> Previous
+                </button>
+                <span>
+                  Page {issuesPage} of {totalIssuePages}
+                </span>
+                <button
+                  onClick={() => setIssuesPage((p) => p + 1)}
+                  disabled={issuesPage === totalIssuePages}
+                  className="flex items-center px-3 py-1 border rounded-md disabled:opacity-50"
+                >
+                  Next <ChevronRight size={16} className="ml-1" />
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-lg shadow p-8">
@@ -608,7 +648,7 @@ export default function AssetDetailPage({
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {activityLog.map((log) => {
+                  {paginatedActivityLog.map((log) => {
                     if (!log.event_log) return null;
                     const userName =
                       `${log.event_log.created_by?.first_name || ""} ${log.event_log.created_by?.last_name || ""}`.trim();
@@ -651,6 +691,27 @@ export default function AssetDetailPage({
                 </tbody>
               </table>
             </div>
+            {activityLog.length > ITEMS_PER_PAGE && (
+              <div className="mt-4 flex justify-between items-center text-sm">
+                <button
+                  onClick={() => setActivityLogPage((p) => p - 1)}
+                  disabled={activityLogPage === 1}
+                  className="flex items-center px-3 py-1 border rounded-md disabled:opacity-50"
+                >
+                  <ChevronLeft size={16} className="mr-1" /> Previous
+                </button>
+                <span>
+                  Page {activityLogPage} of {totalActivityLogPages}
+                </span>
+                <button
+                  onClick={() => setActivityLogPage((p) => p + 1)}
+                  disabled={activityLogPage === totalActivityLogPages}
+                  className="flex items-center px-3 py-1 border rounded-md disabled:opacity-50"
+                >
+                  Next <ChevronRight size={16} className="ml-1" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

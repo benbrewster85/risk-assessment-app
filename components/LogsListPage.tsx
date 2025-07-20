@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   EventLog,
   ProjectListItem,
@@ -15,10 +16,10 @@ import CreateReportSelectorModal, {
 import LogShiftReportModal from "./LogShiftReportModal";
 import LogLostShiftReportModal from "./LogLostShiftReportModal";
 import LogIncidentReportModal from "./LogIncidentReportModal";
-import ViewReportModal from "./ViewReportModal"; // Import our new master modal
+import ViewReportModal from "./ViewReportModal";
 import { Plus, ChevronLeft, ChevronRight } from "react-feather";
-import { toast } from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
+import { toast } from "react-hot-toast";
 
 type LogsListPageProps = {
   initialReports: EventLog[];
@@ -31,6 +32,12 @@ type LogsListPageProps = {
 };
 
 const ITEMS_PER_PAGE = 10;
+const reportTypes = [
+  "Shift Report",
+  "Lost Shift Report",
+  "Incident Report",
+  "Site Briefing",
+];
 
 export default function LogsListPage({
   initialReports,
@@ -44,23 +51,68 @@ export default function LogsListPage({
   const router = useRouter();
   const supabase = createClient();
   const [reports, setReports] = useState(initialReports);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // State for modals
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [isShiftReportModalOpen, setIsShiftReportModalOpen] = useState(false);
   const [isLostShiftModalOpen, setIsLostShiftModalOpen] = useState(false);
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
-
-  // This state now just holds the ID of the report we want to view
   const [viewingReportId, setViewingReportId] = useState<string | null>(null);
 
+  // State for filters
   const [projectFilter, setProjectFilter] = useState("");
   const [userFilter, setUserFilter] = useState("");
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
+  const [logTypeFilter, setLogTypeFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
+  const fetchFilteredReports = useCallback(async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase.rpc("get_filtered_event_logs", {
+      team_id_param: teamId,
+      project_id_param: projectFilter || null,
+      user_id_param: userFilter || null,
+      start_date_param: startDateFilter || null,
+      end_date_param: endDateFilter || null,
+      log_type_param: logTypeFilter || null,
+    });
+
+    if (error) {
+      toast.error("Failed to fetch reports.");
+      console.error(error);
+    } else {
+      setReports(data as EventLog[]);
+    }
+    setIsLoading(false);
+  }, [
+    supabase,
+    teamId,
+    projectFilter,
+    userFilter,
+    startDateFilter,
+    endDateFilter,
+    logTypeFilter,
+  ]);
+
   useEffect(() => {
-    setReports(initialReports);
-  }, [initialReports]);
+    fetchFilteredReports();
+    setCurrentPage(1); // Reset to first page on filter change
+  }, [
+    projectFilter,
+    userFilter,
+    startDateFilter,
+    endDateFilter,
+    logTypeFilter,
+  ]);
+
+  const paginatedReports = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return reports.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [reports, currentPage]);
+
+  const totalPages = Math.ceil(reports.length / ITEMS_PER_PAGE);
 
   const handleReportTypeSelect = (reportType: ReportType) => {
     setIsSelectorOpen(false);
@@ -69,33 +121,11 @@ export default function LogsListPage({
     } else if (reportType === "Lost Shift Report") {
       setIsLostShiftModalOpen(true);
     } else if (reportType === "Incident Report") {
-      // Add this 'else if' block
       setIsIncidentModalOpen(true);
     } else {
       toast.error(`${reportType} form not implemented yet.`);
     }
   };
-
-  const filteredReports = useMemo(() => {
-    return reports.filter((report) => {
-      const reportDate = new Date(report.created_at);
-      const projectMatch =
-        !projectFilter || report.project?.id === projectFilter;
-      const userMatch = !userFilter || report.created_by?.id === userFilter;
-      const startDateMatch =
-        !startDateFilter || reportDate >= new Date(startDateFilter);
-      const endDateMatch =
-        !endDateFilter || reportDate <= new Date(endDateFilter);
-      return projectMatch && userMatch && startDateMatch && endDateMatch;
-    });
-  }, [reports, projectFilter, userFilter, startDateFilter, endDateFilter]);
-
-  const paginatedReports = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredReports.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredReports, currentPage]);
-
-  const totalPages = Math.ceil(filteredReports.length / ITEMS_PER_PAGE);
 
   return (
     <>
@@ -107,7 +137,10 @@ export default function LogsListPage({
       <LogShiftReportModal
         isOpen={isShiftReportModalOpen}
         onClose={() => setIsShiftReportModalOpen(false)}
-        onSuccess={() => router.refresh()}
+        onSuccess={() => {
+          router.refresh();
+          fetchFilteredReports();
+        }}
         teamId={teamId}
         userId={userId}
         projects={projects}
@@ -118,7 +151,10 @@ export default function LogsListPage({
       <LogLostShiftReportModal
         isOpen={isLostShiftModalOpen}
         onClose={() => setIsLostShiftModalOpen(false)}
-        onSuccess={() => router.refresh()}
+        onSuccess={() => {
+          router.refresh();
+          fetchFilteredReports();
+        }}
         teamId={teamId}
         userId={userId}
         projects={projects}
@@ -127,10 +163,14 @@ export default function LogsListPage({
       <LogIncidentReportModal
         isOpen={isIncidentModalOpen}
         onClose={() => setIsIncidentModalOpen(false)}
-        onSuccess={() => router.refresh()}
+        onSuccess={() => {
+          router.refresh();
+          fetchFilteredReports();
+        }}
         teamId={teamId}
         userId={userId}
         projects={projects}
+        teamMembers={teamMembers}
       />
       <ViewReportModal
         reportId={viewingReportId}
@@ -151,8 +191,8 @@ export default function LogsListPage({
           </div>
 
           <div className="mb-4 p-4 bg-white rounded-lg shadow border">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-              <h3 className="text-lg font-semibold col-span-1 md:col-span-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+              <h3 className="text-lg font-semibold col-span-full">
                 Filter Reports
               </h3>
               <div>
@@ -181,7 +221,7 @@ export default function LogsListPage({
                   htmlFor="userFilter"
                   className="block text-sm font-medium text-gray-700"
                 >
-                  User
+                  User Involved
                 </label>
                 <select
                   id="userFilter"
@@ -193,6 +233,27 @@ export default function LogsListPage({
                   {teamMembers.map((m) => (
                     <option key={m.id} value={m.id}>
                       {`${m.first_name || ""} ${m.last_name || ""}`.trim()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label
+                  htmlFor="logTypeFilter"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Report Type
+                </label>
+                <select
+                  id="logTypeFilter"
+                  value={logTypeFilter}
+                  onChange={(e) => setLogTypeFilter(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                >
+                  <option value="">All Types</option>
+                  {reportTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
                     </option>
                   ))}
                 </select>
@@ -252,31 +313,40 @@ export default function LogsListPage({
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {paginatedReports.map((report) => (
-                  <tr key={report.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
-                      {report.log_type}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {new Date(report.start_time).toLocaleDateString("en-GB")}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {report.project?.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {`${report.created_by?.first_name || ""} ${report.created_by?.last_name || ""}`.trim()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => setViewingReportId(report.id)}
-                        className="text-indigo-600 hover:text-indigo-900"
-                      >
-                        View Details
-                      </button>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="text-center text-gray-500 py-8">
+                      Loading...
                     </td>
                   </tr>
-                ))}
-                {paginatedReports.length === 0 && (
+                ) : paginatedReports.length > 0 ? (
+                  paginatedReports.map((report) => (
+                    <tr key={report.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
+                        {report.log_type}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {new Date(report.start_time).toLocaleDateString(
+                          "en-GB"
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {report.project?.name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {`${report.created_by?.first_name || ""} ${report.created_by?.last_name || ""}`.trim()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => setViewingReportId(report.id)}
+                          className="text-indigo-600 hover:text-indigo-900"
+                        >
+                          View Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
                   <tr>
                     <td colSpan={5} className="text-center text-gray-500 py-8">
                       No reports match the current filters.
@@ -286,7 +356,7 @@ export default function LogsListPage({
               </tbody>
             </table>
           </div>
-          {filteredReports.length > ITEMS_PER_PAGE && (
+          {reports.length > ITEMS_PER_PAGE && (
             <div className="mt-4 flex justify-between items-center text-sm">
               <button
                 onClick={() => setCurrentPage((p) => p - 1)}

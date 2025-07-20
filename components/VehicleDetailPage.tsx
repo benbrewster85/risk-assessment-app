@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   Vehicle,
@@ -19,6 +19,8 @@ import {
   Tool,
   FileText,
   Eye,
+  ChevronLeft,
+  ChevronRight,
 } from "react-feather";
 import { useRouter } from "next/navigation";
 import LogVehicleIssueModal from "./LogVehicleIssueModal";
@@ -74,6 +76,10 @@ export default function VehicleDetailPage({
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
   const [viewingNote, setViewingNote] = useState<string | null>(null);
+  const ITEMS_PER_PAGE = 10;
+  const [eventsPage, setEventsPage] = useState(1);
+  const [mileageLogPage, setMileageLogPage] = useState(1);
+  const [activityLogPage, setActivityLogPage] = useState(1);
   const [resolvingEvent, setResolvingEvent] = useState<VehicleEvent | null>(
     null
   );
@@ -106,9 +112,29 @@ export default function VehicleDetailPage({
     router.refresh();
   };
 
+  // Memoized calculations for paginated data
+  const paginatedEvents = useMemo(() => {
+    const startIndex = (eventsPage - 1) * ITEMS_PER_PAGE;
+    return events.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [events, eventsPage]);
+
+  const paginatedMileageLogs = useMemo(() => {
+    const startIndex = (mileageLogPage - 1) * ITEMS_PER_PAGE;
+    return mileageLogs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [mileageLogs, mileageLogPage]);
+
+  const paginatedActivityLog = useMemo(() => {
+    const startIndex = (activityLogPage - 1) * ITEMS_PER_PAGE;
+    return activityLog.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [activityLog, activityLogPage]);
+
+  const totalEventPages = Math.ceil(events.length / ITEMS_PER_PAGE);
+  const totalMileageLogPages = Math.ceil(mileageLogs.length / ITEMS_PER_PAGE);
+  const totalActivityLogPages = Math.ceil(activityLog.length / ITEMS_PER_PAGE);
+
   const handleIssueResolved = (updatedEvent: VehicleEvent) => {
     setEvents(
-      events.map((event) =>
+      paginatedEvents.map((event) =>
         event.id === updatedEvent.id ? updatedEvent : event
       )
     );
@@ -380,6 +406,28 @@ export default function VehicleDetailPage({
                 </p>
               )}
             </div>
+            {/* Pagination Controls for Issues */}
+            {events.length > ITEMS_PER_PAGE && (
+              <div className="mt-6 flex justify-between items-center text-sm">
+                <button
+                  onClick={() => setEventsPage((p) => p - 1)}
+                  disabled={eventsPage === 1}
+                  className="flex items-center px-3 py-1 border rounded-md disabled:opacity-50"
+                >
+                  <ChevronLeft size={16} className="mr-1" /> Previous
+                </button>
+                <span>
+                  Page {eventsPage} of {totalEventPages}
+                </span>
+                <button
+                  onClick={() => setEventsPage((p) => p + 1)}
+                  disabled={eventsPage === totalEventPages}
+                  className="flex items-center px-3 py-1 border rounded-md disabled:opacity-50"
+                >
+                  Next <ChevronRight size={16} className="ml-1" />
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-lg shadow p-8">
@@ -409,7 +457,7 @@ export default function VehicleDetailPage({
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {mileageLogs.map((log) => (
+                  {paginatedMileageLogs.map((log) => (
                     <tr key={log.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {new Date(log.journey_date).toLocaleDateString("en-GB")}
@@ -453,6 +501,27 @@ export default function VehicleDetailPage({
                 </tbody>
               </table>
             </div>
+            {mileageLogs.length > ITEMS_PER_PAGE && (
+              <div className="mt-4 flex justify-between items-center text-sm">
+                <button
+                  onClick={() => setMileageLogPage((p) => p - 1)}
+                  disabled={mileageLogPage === 1}
+                  className="flex items-center px-3 py-1 border rounded-md disabled:opacity-50"
+                >
+                  <ChevronLeft size={16} className="mr-1" /> Previous
+                </button>
+                <span>
+                  Page {mileageLogPage} of {totalMileageLogPages}
+                </span>
+                <button
+                  onClick={() => setMileageLogPage((p) => p + 1)}
+                  disabled={mileageLogPage === totalMileageLogPages}
+                  className="flex items-center px-3 py-1 border rounded-md disabled:opacity-50"
+                >
+                  Next <ChevronRight size={16} className="ml-1" />
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-lg shadow p-8">
@@ -476,7 +545,7 @@ export default function VehicleDetailPage({
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {activityLog.map((log) => {
+                  {paginatedActivityLog.map((log) => {
                     if (!log.event_log) return null;
                     const userName =
                       `${log.event_log.created_by?.first_name || ""} ${log.event_log.created_by?.last_name || ""}`.trim();
@@ -519,6 +588,27 @@ export default function VehicleDetailPage({
                 </tbody>
               </table>
             </div>
+            {mileageLogs.length > ITEMS_PER_PAGE && (
+              <div className="mt-4 flex justify-between items-center text-sm">
+                <button
+                  onClick={() => setMileageLogPage((p) => p - 1)}
+                  disabled={mileageLogPage === 1}
+                  className="flex items-center px-3 py-1 border rounded-md disabled:opacity-50"
+                >
+                  <ChevronLeft size={16} className="mr-1" /> Previous
+                </button>
+                <span>
+                  Page {mileageLogPage} of {totalMileageLogPages}
+                </span>
+                <button
+                  onClick={() => setMileageLogPage((p) => p + 1)}
+                  disabled={mileageLogPage === totalMileageLogPages}
+                  className="flex items-center px-3 py-1 border rounded-md disabled:opacity-50"
+                >
+                  Next <ChevronRight size={16} className="ml-1" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
