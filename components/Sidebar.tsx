@@ -2,15 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Folder, HardDrive, Truck, Users, FileText } from "react-feather";
+import {
+  Home,
+  Folder,
+  HardDrive,
+  Truck,
+  Users,
+  FileText,
+  Calendar,
+} from "react-feather";
 
 const navLinks = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
+  { name: "Scheduler", href: "/dashboard/scheduler", icon: Calendar },
   { name: "Projects", href: "/dashboard/projects", icon: Folder },
   { name: "Logs & Records", href: "/dashboard/logs", icon: FileText },
-  { name: "Assets", href: "/dashboard/assets", icon: HardDrive },
-  { name: "Vehicles", href: "/dashboard/vehicles", icon: Truck },
-  { name: "My Team", href: "/dashboard/team", icon: Users },
+  { name: "Asset Management", href: "/dashboard/assets", icon: HardDrive },
+  { name: "Vehicle Management", href: "/dashboard/vehicles", icon: Truck },
+  { name: "Team Management", href: "/dashboard/team", icon: Users },
 ];
 
 type SidebarProps = {

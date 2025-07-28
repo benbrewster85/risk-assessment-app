@@ -55,3 +55,12 @@ export type VehicleActivityLog = {
     event_log: EventLog | null;
 };
 
+export type ScheduleEvent = {
+    id: string;
+    start_date: string;
+    end_date: string | null;
+    title: string;
+    project: { name: string | null } | null;
+    personnel: { user_id: string }[];
+    vehicles: { vehicle_id: string }[];
+};

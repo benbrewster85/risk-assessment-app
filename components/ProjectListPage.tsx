@@ -35,6 +35,13 @@ export default function ProjectListPage({
   const [projectAddress, setProjectAddress] = useState("");
   const [projectW3W, setNewProjectW3W] = useState("");
 
+  const [filter, setFilter] = useState("");
+  // Sorting state
+  const [sortBy, setSortBy] = useState<"name" | "reference" | "last_edited_at">(
+    "name"
+  );
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
   const isEditing = editingProject !== null;
 
   useEffect(() => {
@@ -122,6 +129,40 @@ export default function ProjectListPage({
     }
     setDeletingProjectId(null);
   };
+
+  // Filtering
+  const filteredProjects = projects.filter(
+    (project) =>
+      project.name.toLowerCase().includes(filter.toLowerCase()) ||
+      (project.reference || "").toLowerCase().includes(filter.toLowerCase())
+  );
+
+  // Sorting
+  const sortedProjects = [...filteredProjects].sort((a, b) => {
+    let aValue = a[sortBy] || "";
+    let bValue = b[sortBy] || "";
+
+    if (sortBy === "last_edited_at") {
+      const aTime = aValue ? new Date(aValue).getTime() : 0;
+      const bTime = bValue ? new Date(bValue).getTime() : 0;
+      if (aTime < bTime) return sortDirection === "asc" ? -1 : 1;
+      if (aTime > bTime) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    }
+
+    if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+    if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  function handleSort(column: "name" | "reference" | "last_edited_at") {
+    if (sortBy === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortDirection("asc");
+    }
+  }
 
   return (
     <>
@@ -231,63 +272,124 @@ export default function ProjectListPage({
               </button>
             )}
           </div>
+          {/* Filter Section */}
+          <div className="mb-6 p-4 bg-white rounded-lg shadow border">
+            <h3 className="text-lg font-semibold mb-4">Filter Projects</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Search by Name or Reference
+                </label>
+                <input
+                  type="text"
+                  placeholder="Type to filter..."
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  className="block w-full rounded-md border-gray-300 shadow-sm p-2"
+                />
+              </div>
+              {/* Example: Add more filters here later */}
+              {/* <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
+                <select className="block w-full rounded-md border-gray-300 shadow-sm p-2">
+                  <option value="">All Statuses</option>
+                  <option value="Active">Active</option>
+                  <option value="Archived">Archived</option>
+                </select>
+              </div> */}
+            </div>
+          </div>
+          {/* Project Table */}
           <div className="bg-white p-6 rounded-lg shadow">
-            {projects.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {projects.map((project) => (
-                  <div
-                    key={project.id}
-                    className="border p-4 rounded-lg flex flex-col justify-between bg-slate-50 hover:shadow-lg"
-                  >
-                    <Link
-                      href={`/dashboard/project/${project.id}`}
-                      className="block flex-grow"
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
+                      onClick={() => handleSort("name")}
                     >
-                      <h3 className="font-bold text-xl mb-2 text-blue-700 hover:underline">
-                        {project.name}
-                      </h3>
-                      <p className="text-gray-600 text-sm">
-                        Ref: {project.reference || "N/A"}
-                      </p>
-                    </Link>
-                    <div className="flex-shrink-0 mt-4">
-                      <p className="text-gray-500 text-xs">
-                        Last edited:{" "}
-                        {new Date(project.last_edited_at).toLocaleDateString(
-                          "en-GB",
-                          { day: "2-digit", month: "short", year: "numeric" }
-                        )}
-                      </p>
-                      {currentUserRole === "team_admin" && (
-                        <div className="border-t mt-2 pt-2 flex justify-end space-x-3">
-                          <button
-                            onClick={() => openEditModal(project)}
-                            className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+                      Name{" "}
+                      {sortBy === "name" &&
+                        (sortDirection === "asc" ? "▲" : "▼")}
+                    </th>
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
+                      onClick={() => handleSort("reference")}
+                    >
+                      Reference{" "}
+                      {sortBy === "reference" &&
+                        (sortDirection === "asc" ? "▲" : "▼")}
+                    </th>
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
+                      onClick={() => handleSort("last_edited_at")}
+                    >
+                      Last Edited{" "}
+                      {sortBy === "last_edited_at" &&
+                        (sortDirection === "asc" ? "▲" : "▼")}
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {sortedProjects.length > 0 ? (
+                    sortedProjects.map((project) => (
+                      <tr key={project.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
+                          <Link
+                            href={`/dashboard/project/${project.id}`}
+                            className="text-blue-700 hover:underline font-bold"
                           >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => setDeletingProjectId(project.id)}
-                            className="text-sm font-medium text-red-600 hover:text-red-800"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <h3 className="text-xl font-medium">No projects yet.</h3>
-                {currentUserRole === "team_admin" && (
-                  <p className="text-gray-500 mt-2">
-                    Get started by creating your first project.
-                  </p>
-                )}
-              </div>
-            )}
+                            {project.name}
+                          </Link>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {project.reference || "N/A"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {new Date(project.last_edited_at).toLocaleDateString(
+                            "en-GB",
+                            { day: "2-digit", month: "short", year: "numeric" }
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {currentUserRole === "team_admin" && (
+                            <>
+                              <button
+                                onClick={() => openEditModal(project)}
+                                className="text-sm font-medium text-indigo-600 hover:text-indigo-800 mr-2"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => setDeletingProjectId(project.id)}
+                                className="text-sm font-medium text-red-600 hover:text-red-800"
+                              >
+                                Delete
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="text-center text-gray-500 py-8"
+                      >
+                        No projects found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
