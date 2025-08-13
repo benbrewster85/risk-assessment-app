@@ -78,3 +78,20 @@ export type ReportSignature = {
         id: string;
     } | null;
 };
+
+export type ShiftReport = {
+    id: string;
+    created_at: string;
+    start_time: string;
+    end_time: string | null;
+    work_completed: string | null;
+    notes: string | null;
+    project: {
+        id: string;
+        name: string;
+    } | null;
+    created_by: {
+        first_name: string | null;
+        last_name: string | null;
+    } | null;
+};

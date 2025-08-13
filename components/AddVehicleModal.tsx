@@ -4,14 +4,13 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-hot-toast";
 import Modal from "./Modal";
-import { Vehicle, TeamMember } from "@/lib/types";
+import { Vehicle } from "@/lib/types";
 
 type AddVehicleModalProps = {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (vehicle: Vehicle) => void;
   teamId: string | null;
-  teamMembers: TeamMember[]; // This was the missing prop
   vehicleToEdit: Vehicle | null;
 };
 
@@ -20,14 +19,12 @@ export default function AddVehicleModal({
   onClose,
   onSuccess,
   teamId,
-  teamMembers,
   vehicleToEdit,
 }: AddVehicleModalProps) {
   const supabase = createClient();
   const [registration, setRegistration] = useState("");
   const [manufacturer, setManufacturer] = useState("");
   const [model, setModel] = useState("");
-  const [ownerId, setOwnerId] = useState<string | null>("");
   const [lastServiced, setLastServiced] = useState("");
   const [serviceCycle, setServiceCycle] = useState(12);
   const [motDueDate, setMotDueDate] = useState("");
@@ -41,7 +38,6 @@ export default function AddVehicleModal({
         setRegistration(vehicleToEdit.registration_number);
         setManufacturer(vehicleToEdit.manufacturer || "");
         setModel(vehicleToEdit.model || "");
-        setOwnerId(vehicleToEdit.owner_id || "");
         setLastServiced(vehicleToEdit.last_serviced_date || "");
         setServiceCycle(vehicleToEdit.service_cycle_months || 12);
         setMotDueDate(vehicleToEdit.mot_due_date || "");
@@ -49,7 +45,6 @@ export default function AddVehicleModal({
         setRegistration("");
         setManufacturer("");
         setModel("");
-        setOwnerId("");
         setLastServiced("");
         setServiceCycle(12);
         setMotDueDate("");
@@ -59,17 +54,17 @@ export default function AddVehicleModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!registration || !teamId) {
-      toast.error("Registration Number and Team ID are required.");
+    if (!registration) {
+      toast.error("Registration Number is required.");
       return;
     }
     setIsSubmitting(true);
 
+    // This data object no longer includes `owner_id`
     const vehicleData = {
       registration_number: registration.toUpperCase().replace(/\s/g, ""),
       manufacturer: manufacturer || null,
       model: model || null,
-      owner_id: ownerId || null,
       last_serviced_date: lastServiced || null,
       service_cycle_months: serviceCycle,
       mot_due_date: motDueDate || null,
@@ -78,7 +73,7 @@ export default function AddVehicleModal({
     const { data, error } = isEditing
       ? await supabase
           .from("vehicles")
-          .update({ ...vehicleData, team_id: teamId })
+          .update(vehicleData)
           .eq("id", vehicleToEdit!.id)
           .select()
           .single()
@@ -111,98 +106,62 @@ export default function AddVehicleModal({
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="registration" className="block text-sm font-medium">
-              Registration Number
-            </label>
+            <label htmlFor="registration">Registration Number</label>
             <input
               id="registration"
               type="text"
               value={registration}
               onChange={(e) => setRegistration(e.target.value)}
               required
-              className="mt-1 block w-full"
             />
           </div>
+          <div></div> {/* This empty div keeps the layout consistent */}
           <div>
-            <label htmlFor="owner" className="block text-sm font-medium">
-              Owner
-            </label>
-            <select
-              id="owner"
-              value={ownerId || ""}
-              onChange={(e) => setOwnerId(e.target.value)}
-              className="mt-1 block w-full"
-            >
-              <option value="">(No specific owner)</option>
-              {teamMembers.map((member) => (
-                <option
-                  key={member.id}
-                  value={member.id}
-                >{`${member.first_name} ${member.last_name}`}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="manufacturer" className="block text-sm font-medium">
-              Manufacturer
-            </label>
+            <label htmlFor="manufacturer">Manufacturer</label>
             <input
               id="manufacturer"
               type="text"
               value={manufacturer}
               onChange={(e) => setManufacturer(e.target.value)}
-              className="mt-1 block w-full"
             />
           </div>
           <div>
-            <label htmlFor="model" className="block text-sm font-medium">
-              Model
-            </label>
+            <label htmlFor="model">Model</label>
             <input
               id="model"
               type="text"
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              className="mt-1 block w-full"
             />
           </div>
         </div>
         <div className="border-t pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="lastServiced" className="block text-sm font-medium">
-              Last Service Date
-            </label>
+            <label htmlFor="lastServiced">Last Service Date</label>
             <input
-              id="lastServiced"
               type="date"
+              id="lastServiced"
               value={lastServiced}
               onChange={(e) => setLastServiced(e.target.value)}
-              className="mt-1 block w-full"
             />
           </div>
           <div>
-            <label htmlFor="serviceCycle" className="block text-sm font-medium">
-              Service Cycle (Months)
-            </label>
+            <label htmlFor="serviceCycle">Service Cycle (Months)</label>
             <input
               type="number"
               id="serviceCycle"
               value={serviceCycle}
               onChange={(e) => setServiceCycle(Number(e.target.value))}
               required
-              className="mt-1 block w-full"
             />
           </div>
           <div>
-            <label htmlFor="motDueDate" className="block text-sm font-medium">
-              MOT Due Date
-            </label>
+            <label htmlFor="motDueDate">MOT Due Date</label>
             <input
               type="date"
               id="motDueDate"
               value={motDueDate}
               onChange={(e) => setMotDueDate(e.target.value)}
-              className="mt-1 block w-full"
             />
           </div>
         </div>
