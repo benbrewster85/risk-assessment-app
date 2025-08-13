@@ -25,6 +25,7 @@ export default function VehicleListPage({
   teamMembers,
   teamId,
   isCurrentUserAdmin,
+  canCurrentUserEdit,
   currentUserId,
 }: VehicleListPageProps) {
   const supabase = createClient();
@@ -42,12 +43,10 @@ export default function VehicleListPage({
   const handleSuccess = () => {
     router.refresh();
   };
-
   const openCreateModal = () => {
     setEditingVehicle(null);
     setIsAddModalOpen(true);
   };
-
   const openEditModal = (vehicle: Vehicle) => {
     setEditingVehicle(vehicle);
     setIsAddModalOpen(true);
@@ -75,13 +74,12 @@ export default function VehicleListPage({
         onClose={() => setIsAddModalOpen(false)}
         onSuccess={handleSuccess}
         teamId={teamId}
-        teamMembers={teamMembers}
         vehicleToEdit={editingVehicle}
       />
       <LogMileageModal
         isOpen={isMileageModalOpen}
         onClose={() => setIsMileageModalOpen(false)}
-        onSuccess={handleSuccess}
+        onSuccess={() => router.refresh()}
         vehicles={vehicles}
         teamId={teamId}
         userId={currentUserId}
@@ -91,7 +89,7 @@ export default function VehicleListPage({
         onClose={() => setDeletingVehicle(null)}
         onConfirm={handleDeleteVehicle}
         title="Delete Vehicle"
-        message={`Are you sure you want to delete vehicle ${deletingVehicle?.registration_number}? This action cannot be undone.`}
+        message={`Are you sure you want to delete vehicle ${deletingVehicle?.registration_number}?`}
         isDestructive={true}
         confirmText="Delete"
       />
@@ -108,7 +106,7 @@ export default function VehicleListPage({
                 <Edit className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Log Journey</span>
               </button>
-              {isCurrentUserAdmin && (
+              {canCurrentUserEdit && (
                 <>
                   <a
                     href="/api/vehicles/export"
@@ -133,19 +131,19 @@ export default function VehicleListPage({
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     Registration
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     Vehicle
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     Assigned To
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     Service Due
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                     MOT Due
                   </th>
                   <th className="relative px-6 py-3">
@@ -166,9 +164,6 @@ export default function VehicleListPage({
                       : null;
                   const assigneeName =
                     `${(vehicle as any).assignee_first_name || ""} ${(vehicle as any).assignee_last_name || ""}`.trim();
-                  const ownerName =
-                    `${(vehicle as any).owner_first_name || ""} ${(vehicle as any).owner_last_name || ""}`.trim();
-
                   return (
                     <tr key={vehicle.id}>
                       <td className="px-6 py-4 whitespace-nowrap font-mono text-sm font-semibold">
@@ -180,7 +175,7 @@ export default function VehicleListPage({
                         </Link>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium">
                           {vehicle.manufacturer}
                         </div>
                         <div className="text-sm text-gray-500">
@@ -203,7 +198,7 @@ export default function VehicleListPage({
                           : "N/A"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-4">
-                        {isCurrentUserAdmin && (
+                        {canCurrentUserEdit && (
                           <>
                             <button
                               onClick={() => openEditModal(vehicle)}
@@ -223,13 +218,6 @@ export default function VehicleListPage({
                     </tr>
                   );
                 })}
-                {vehicles.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="text-center text-gray-500 py-8">
-                      No vehicles added yet.
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
