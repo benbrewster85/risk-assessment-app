@@ -14,7 +14,7 @@ import {
 
 const navLinks = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
-  { name: "Scheduler", href: "/dashboard/scheduler", icon: Calendar },
+  { name: "Scheduler", href: "#", icon: Calendar, status: "coming_soon" }, // Updated this line
   { name: "Projects", href: "/dashboard/projects", icon: Folder },
   { name: "Logs & Records", href: "/dashboard/logs", icon: FileText },
   { name: "Asset Management", href: "/dashboard/assets", icon: HardDrive },
@@ -34,9 +34,27 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     <nav className="flex-1 px-4 py-6 space-y-2">
       {navLinks.map((link) => {
         const isActive =
-          link.href === "/dashboard"
+          link.href !== "#" &&
+          (link.href === "/dashboard"
             ? pathname === link.href
-            : pathname.startsWith(link.href);
+            : pathname.startsWith(link.href));
+        const isComingSoon = link.status === "coming_soon";
+
+        if (isComingSoon) {
+          return (
+            <span
+              key={link.name}
+              className="flex items-center px-4 py-2 text-sm font-medium rounded-lg text-gray-400 cursor-not-allowed group"
+            >
+              <link.icon className="mr-3 h-5 w-5 flex-shrink-0" />
+              {link.name}
+              <span className="ml-auto text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
+                Soon
+              </span>
+            </span>
+          );
+        }
+
         return (
           <Link
             key={link.name}
