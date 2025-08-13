@@ -5,6 +5,7 @@ import {
   RiskAssessmentListItem,
   DynamicRisk,
   EventLog,
+  Task,
 } from "@/lib/types";
 import ProjectClientPage from "@/components/ProjectClientPage";
 
@@ -35,26 +36,30 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     notFound();
   }
 
-  // Fetch the project's related data in parallel
-  const [raResult, dynamicRisksResult, shiftReportsResult] = await Promise.all([
-    supabase
-      .from("risk_assessments")
-      .select("id, name, description, created_at")
-      .eq("project_id", projectId),
-    supabase
-      .from("dynamic_risks")
-      .select("*, logged_by:profiles(first_name, last_name)")
-      .eq("project_id", projectId)
-      .order("logged_at", { ascending: false }),
-    // NEW: Fetch shift reports for this project
-    supabase
-      .from("event_logs")
-      .select(
-        "*, created_by:profiles(first_name, last_name), project:projects(name)"
-      )
-      .eq("project_id", projectId)
-      .order("start_time", { ascending: false }),
-  ]);
+  const [raResult, dynamicRisksResult, shiftReportsResult, tasksResult] =
+    await Promise.all([
+      supabase
+        .from("risk_assessments")
+        .select("id, name, description, created_at")
+        .eq("project_id", projectId),
+      supabase
+        .from("dynamic_risks")
+        .select("*, logged_by:profiles(first_name, last_name)")
+        .eq("project_id", projectId)
+        .order("logged_at", { ascending: false }),
+      supabase
+        .from("event_logs")
+        .select(
+          "*, created_by:profiles(first_name, last_name, id), project:projects(id, name)"
+        )
+        .eq("project_id", projectId)
+        .order("start_time", { ascending: false }),
+      supabase
+        .from("tasks")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("sort_order"),
+    ]);
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -69,6 +74,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       initialRiskAssessments={(raResult.data as RiskAssessmentListItem[]) || []}
       initialDynamicRisks={(dynamicRisksResult.data as DynamicRisk[]) || []}
       initialShiftReports={(shiftReportsResult.data as EventLog[]) || []}
+      initialTasks={(tasksResult.data as Task[]) || []}
       currentUserId={user.id}
       currentUserRole={currentUserRole}
     />

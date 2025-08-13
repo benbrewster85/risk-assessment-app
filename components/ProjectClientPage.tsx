@@ -11,29 +11,22 @@ import {
   RiskAssessmentListItem,
   DynamicRisk,
   EventLog,
+  Task,
 } from "@/lib/types";
 import DynamicRiskLog from "./DynamicRiskLog";
 import ProjectDetailsTab from "./ProjectDetailsTab";
 import MethodStatementTab from "./MethodStatementTab";
+import ProjectBriefTab from "./ProjectBriefTab";
+import ViewReportModal from "./ViewReportModal";
 import { toast } from "react-hot-toast";
 import { Plus, AlertTriangle } from "react-feather";
-
-// A small helper component to format the linked items cleanly inside the modal
-const LinkedItem = ({
-  item,
-}: {
-  item: { id: string; name: string | null };
-}) => (
-  <span className="inline-block bg-blue-100 text-blue-800 text-xs font-medium mr-2 mb-2 px-2.5 py-0.5 rounded-full">
-    {item.name}
-  </span>
-);
 
 type ProjectClientPageProps = {
   initialProject: Project;
   initialRiskAssessments: RiskAssessmentListItem[];
   initialDynamicRisks: DynamicRisk[];
   initialShiftReports: EventLog[];
+  initialTasks: Task[];
   currentUserId: string;
   currentUserRole: string;
 };
@@ -43,6 +36,7 @@ export default function ProjectClientPage({
   initialRiskAssessments,
   initialDynamicRisks,
   initialShiftReports,
+  initialTasks,
   currentUserId,
   currentUserRole,
 }: ProjectClientPageProps) {
@@ -54,6 +48,7 @@ export default function ProjectClientPage({
   );
   const [dynamicRisks, setDynamicRisks] = useState(initialDynamicRisks);
   const [shiftReports, setShiftReports] = useState(initialShiftReports);
+  const [tasks, setTasks] = useState(initialTasks);
   const [activeTab, setActiveTab] = useState("details");
 
   const [isRaModalOpen, setIsRaModalOpen] = useState(false);
@@ -78,12 +73,8 @@ export default function ProjectClientPage({
   const [safeToContinue, setSafeToContinue] = useState(true);
   const [riskStatus, setRiskStatus] = useState("Temporary");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [viewingReportId, setViewingReportId] = useState<string | null>(null);
 
-  // New state for the shift report detail modal
-  const [viewingReport, setViewingReport] = useState<EventLog | null>(null);
-
-  const isEditingRa = editingRa !== null;
-  const isEditingDynamicRisk = editingDynamicRisk !== null;
   const isAdmin = currentUserRole === "team_admin";
 
   useEffect(() => {
@@ -91,19 +82,21 @@ export default function ProjectClientPage({
     setRiskAssessments(initialRiskAssessments);
     setDynamicRisks(initialDynamicRisks);
     setShiftReports(initialShiftReports);
+    setTasks(initialTasks);
   }, [
     initialProject,
     initialRiskAssessments,
     initialDynamicRisks,
     initialShiftReports,
+    initialTasks,
   ]);
 
   useEffect(() => {
-    if (isEditingRa && editingRa) {
+    if (editingRa) {
       setNewRaName(editingRa.name);
       setNewRaDescription(editingRa.description || "");
     }
-  }, [isEditingRa, editingRa]);
+  }, [editingRa]);
 
   useEffect(() => {
     if (isDynamicRiskModalOpen && editingDynamicRisk) {
@@ -128,6 +121,7 @@ export default function ProjectClientPage({
 
   const handleRaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const isEditing = editingRa !== null;
     if (!newRaName) {
       toast.error("Risk Assessment name is required.");
       return;
@@ -138,7 +132,7 @@ export default function ProjectClientPage({
       project_id: project.id,
       team_id: project.team_id,
     };
-    const { data, error } = isEditingRa
+    const { data, error } = isEditing
       ? await supabase
           .from("risk_assessments")
           .update(raData)
@@ -153,8 +147,8 @@ export default function ProjectClientPage({
     if (error) {
       toast.error(`Failed to save RA: ${error.message}`);
     } else if (data) {
-      toast.success(`RA ${isEditingRa ? "updated" : "created"} successfully!`);
-      if (isEditingRa) {
+      toast.success(`RA ${isEditing ? "updated" : "created"} successfully!`);
+      if (isEditing) {
         setRiskAssessments(
           riskAssessments.map((ra) => (ra.id === data.id ? data : ra))
         );
@@ -197,6 +191,7 @@ export default function ProjectClientPage({
   const handleLogDynamicRiskSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    const isEditing = editingDynamicRisk !== null;
     const dynamicRiskData = {
       project_id: project.id,
       team_id: project.team_id,
@@ -207,7 +202,7 @@ export default function ProjectClientPage({
       is_safe_to_continue: safeToContinue,
       risk_status: riskStatus,
     };
-    const { data: resultRisk, error } = isEditingDynamicRisk
+    const { data: resultRisk, error } = isEditing
       ? await supabase
           .from("dynamic_risks")
           .update(dynamicRiskData)
@@ -223,7 +218,7 @@ export default function ProjectClientPage({
       toast.error(`Error saving dynamic risk: ${error.message}`);
     } else if (resultRisk) {
       toast.success(
-        `Dynamic risk ${isEditingDynamicRisk ? "updated" : "logged"} successfully!`
+        `Dynamic risk ${isEditing ? "updated" : "logged"} successfully!`
       );
       const transformedRisk = {
         ...resultRisk,
@@ -231,14 +226,14 @@ export default function ProjectClientPage({
           ? resultRisk.logged_by[0]
           : resultRisk.logged_by,
       };
-      if (isEditingDynamicRisk) {
+      if (isEditing) {
         setDynamicRisks(
           dynamicRisks.map((r) =>
             r.id === transformedRisk.id ? transformedRisk : r
-          ) as DynamicRisk[]
+          )
         );
       } else {
-        setDynamicRisks([transformedRisk as DynamicRisk, ...dynamicRisks]);
+        setDynamicRisks([transformedRisk, ...dynamicRisks]);
       }
       setIsDynamicRiskModalOpen(false);
     }
@@ -262,41 +257,6 @@ export default function ProjectClientPage({
     setDeletingDynamicRiskId(null);
   };
 
-  const handleViewReportDetails = async (reportId: string) => {
-    const loadingToast = toast.loading("Loading report details...");
-    // This is the new, more explicit and robust query
-    const { data, error } = await supabase
-      .from("event_logs")
-      .select(
-        `
-                *,
-                project:projects(name),
-                created_by:profiles(first_name, last_name),
-                personnel:event_log_personnel!inner(profiles(id, first_name, last_name)),
-                assets:event_log_assets!inner(assets(id, system_id, model)),
-                vehicles:event_log_vehicles!inner(vehicles(id, registration_number, model))
-            `
-      )
-      .eq("id", reportId)
-      .single();
-
-    toast.dismiss(loadingToast);
-    if (error || !data) {
-      toast.error("Could not load report details.");
-      console.error("Error fetching report details:", error);
-    } else {
-      setViewingReport(data as unknown as EventLog);
-    }
-  };
-
-  const formatDateTime = (dateTimeString: string | null) => {
-    if (!dateTimeString) return "N/A";
-    return new Date(dateTimeString).toLocaleString("en-GB", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
-  };
-
   if (!project) return <p className="p-8">Project not found.</p>;
 
   const tabClass = (tabName: string) =>
@@ -306,7 +266,7 @@ export default function ProjectClientPage({
     <>
       <Modal
         title={
-          isEditingRa ? "Edit Risk Assessment" : "Create New Risk Assessment"
+          editingRa ? "Edit Risk Assessment" : "Create New Risk Assessment"
         }
         isOpen={isRaModalOpen}
         onClose={() => setIsRaModalOpen(false)}
@@ -317,11 +277,12 @@ export default function ProjectClientPage({
               Name
             </label>
             <input
-              type="text"
               id="raName"
+              type="text"
               value={newRaName}
               onChange={(e) => setNewRaName(e.target.value)}
               required
+              className="mt-1 block w-full"
             />
           </div>
           <div>
@@ -333,6 +294,7 @@ export default function ProjectClientPage({
               value={newRaDescription}
               onChange={(e) => setNewRaDescription(e.target.value)}
               rows={4}
+              className="mt-1 block w-full"
               placeholder="e.g. This is a ballasted rail track..."
             />
           </div>
@@ -348,13 +310,13 @@ export default function ProjectClientPage({
               type="submit"
               className="py-2 px-4 border rounded-md text-white bg-green-600 hover:bg-green-700"
             >
-              {isEditingRa ? "Save Changes" : "Create"}
+              {editingRa ? "Save Changes" : "Create"}
             </button>
           </div>
         </form>
       </Modal>
       <Modal
-        title={isEditingDynamicRisk ? "Edit Dynamic Risk" : "Log Dynamic Risk"}
+        title={editingDynamicRisk ? "Edit Dynamic Risk" : "Log Dynamic Risk"}
         isOpen={isDynamicRiskModalOpen}
         onClose={() => setIsDynamicRiskModalOpen(false)}
       >
@@ -368,6 +330,7 @@ export default function ProjectClientPage({
               onChange={(e) => setRiskDescription(e.target.value)}
               rows={3}
               required
+              className="mt-1 block w-full"
             />
           </div>
           <div>
@@ -379,6 +342,7 @@ export default function ProjectClientPage({
               onChange={(e) => setControlsTaken(e.target.value)}
               rows={3}
               required
+              className="mt-1 block w-full"
             />
           </div>
           <div>
@@ -389,6 +353,7 @@ export default function ProjectClientPage({
               type="text"
               value={personnelOnSite}
               onChange={(e) => setPersonnelOnSite(e.target.value)}
+              className="mt-1 block w-full"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -399,6 +364,7 @@ export default function ProjectClientPage({
               <select
                 value={String(safeToContinue)}
                 onChange={(e) => setSafeToContinue(e.target.value === "true")}
+                className="mt-1 block w-full"
               >
                 <option value="true">Yes</option>
                 <option value="false">No</option>
@@ -409,6 +375,7 @@ export default function ProjectClientPage({
               <select
                 value={riskStatus}
                 onChange={(e) => setRiskStatus(e.target.value)}
+                className="mt-1 block w-full"
               >
                 <option>Temporary</option>
                 <option>Permanent</option>
@@ -451,93 +418,10 @@ export default function ProjectClientPage({
         isDestructive={true}
         confirmText="Delete"
       />
-
-      <Modal
-        title={`Shift Report for ${viewingReport?.project?.name || ""}`}
-        isOpen={viewingReport !== null}
-        onClose={() => setViewingReport(null)}
-      >
-        {viewingReport && (
-          <div className="text-sm">
-            <p className="text-gray-500 mb-4">
-              Submitted by{" "}
-              {`${viewingReport.created_by?.first_name || ""} ${viewingReport.created_by?.last_name || ""}`.trim()}
-            </p>
-            <dl className="sm:divide-y sm:divide-gray-200">
-              <div className="py-3 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt className="font-medium text-gray-500">Start Time</dt>
-                <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">
-                  {formatDateTime(viewingReport.start_time)}
-                </dd>
-              </div>
-              <div className="py-3 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt className="font-medium text-gray-500">End Time</dt>
-                <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">
-                  {formatDateTime(viewingReport.end_time)}
-                </dd>
-              </div>
-              <div className="py-3 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt className="font-medium text-gray-500">Personnel on Site</dt>
-                <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">
-                  {(viewingReport as any).personnel?.map((p: any) => (
-                    <LinkedItem
-                      key={p.profiles.id}
-                      item={{
-                        id: p.profiles.id,
-                        name: `${p.profiles.first_name} ${p.profiles.last_name}`,
-                      }}
-                    />
-                  )) || "N/A"}
-                </dd>
-              </div>
-              <div className="py-3 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt className="font-medium text-gray-500">Work Completed</dt>
-                <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2 whitespace-pre-wrap">
-                  {viewingReport.work_completed || "No details provided."}
-                </dd>
-              </div>
-              <div className="py-3 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt className="font-medium text-gray-500">Equipment Used</dt>
-                <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">
-                  {(viewingReport as any).assets?.length > 0
-                    ? (viewingReport as any).assets.map((a: any) => (
-                        <LinkedItem
-                          key={a.assets.id}
-                          item={{
-                            id: a.assets.id,
-                            name: `${a.assets.system_id} (${a.assets.model})`,
-                          }}
-                        />
-                      ))
-                    : "None"}
-                </dd>
-              </div>
-              <div className="py-3 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt className="font-medium text-gray-500">Vehicles Used</dt>
-                <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">
-                  {(viewingReport as any).vehicles?.length > 0
-                    ? (viewingReport as any).vehicles.map((v: any) => (
-                        <LinkedItem
-                          key={v.vehicles.id}
-                          item={{
-                            id: v.vehicles.id,
-                            name: `${v.vehicles.registration_number}`,
-                          }}
-                        />
-                      ))
-                    : "None"}
-                </dd>
-              </div>
-              <div className="py-3 sm:grid sm:grid-cols-3 sm:gap-4">
-                <dt className="font-medium text-gray-500">Notes</dt>
-                <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2 whitespace-pre-wrap">
-                  {viewingReport.notes || "No notes."}
-                </dd>
-              </div>
-            </dl>
-          </div>
-        )}
-      </Modal>
+      <ViewReportModal
+        reportId={viewingReportId}
+        onClose={() => setViewingReportId(null)}
+      />
 
       <div className="p-4 sm:p-8">
         <div className="max-w-7xl mx-auto">
@@ -589,6 +473,12 @@ export default function ProjectClientPage({
                   Project Details
                 </button>
                 <button
+                  onClick={() => setActiveTab("brief")}
+                  className={tabClass("brief")}
+                >
+                  Brief & Tasks
+                </button>
+                <button
                   onClick={() => setActiveTab("method_statement")}
                   className={tabClass("method_statement")}
                 >
@@ -623,6 +513,14 @@ export default function ProjectClientPage({
                   setProject(updatedProject as Project)
                 }
                 isCurrentUserAdmin={isAdmin}
+              />
+            )}
+            {activeTab === "brief" && (
+              <ProjectBriefTab
+                project={project}
+                initialTasks={tasks}
+                isCurrentUserAdmin={isAdmin}
+                onBriefUpdate={(updatedProject) => setProject(updatedProject)}
               />
             )}
             {activeTab === "method_statement" && (
@@ -703,16 +601,13 @@ export default function ProjectClientPage({
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                        Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                         Date
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium uppercase">
-                        Time
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                         Created By
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase">
-                        Work Completed Summary
                       </th>
                       <th className="relative px-6 py-3">
                         <span className="sr-only">View</span>
@@ -720,43 +615,29 @@ export default function ProjectClientPage({
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {shiftReports.length > 0 ? (
-                      shiftReports.map((report) => (
-                        <tr key={report.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {new Date(report.start_time).toLocaleDateString(
-                              "en-GB"
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {`${new Date(report.start_time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })} - ${report.end_time ? new Date(report.end_time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "Ongoing"}`}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {`${report.created_by?.first_name || ""} ${report.created_by?.last_name || ""}`.trim()}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-500 max-w-sm truncate">
-                            {report.work_completed}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button
-                              onClick={() => handleViewReportDetails(report.id)}
-                              className="text-indigo-600 hover:text-indigo-900"
-                            >
-                              View Details
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="text-center text-gray-500 py-8"
-                        >
-                          No Shift Reports for this project.
+                    {shiftReports.map((report) => (
+                      <tr key={report.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
+                          {report.log_type}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {new Date(report.start_time).toLocaleDateString(
+                            "en-GB"
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {`${report.created_by?.first_name || ""} ${report.created_by?.last_name || ""}`.trim()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() => setViewingReportId(report.id)}
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            View Details
+                          </button>
                         </td>
                       </tr>
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>

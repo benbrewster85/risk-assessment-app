@@ -8,7 +8,7 @@ import { toast } from "react-hot-toast";
 type MethodStatementTabProps = {
   project: Project;
   isCurrentUserAdmin: boolean;
-  onUpdate: (updatedProject: Project) => void; // New prop
+  onUpdate: (updatedProject: Project) => void;
 };
 
 export default function MethodStatementTab({
@@ -46,7 +46,7 @@ export default function MethodStatementTab({
       toast.error(`Failed to save Method Statement: ${error.message}`);
     } else if (updatedProject) {
       toast.success("Method Statement saved successfully!");
-      onUpdate(updatedProject); // Notify the parent page
+      onUpdate(updatedProject);
     }
     setIsSubmitting(false);
   };
@@ -54,12 +54,12 @@ export default function MethodStatementTab({
   return (
     <form
       onSubmit={handleSaveChanges}
-      className="space-y-6 bg-white p-8 rounded-lg shadow"
+      className="space-y-6 bg-white p-6 rounded-lg shadow"
     >
       <div>
         <label
           htmlFor="methodStatement"
-          className="block text-lg font-bold text-gray-800"
+          className="block text-2xl font-bold text-gray-800"
         >
           Method Statement
         </label>

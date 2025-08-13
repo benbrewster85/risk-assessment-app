@@ -5,11 +5,10 @@ import { Project } from "@/lib/types";
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 
-// UPDATED: The component now accepts the user's admin status
 type ProjectDetailsTabProps = {
   project: Project;
   isCurrentUserAdmin: boolean;
-  onUpdate: (updatedProject: Project) => void; // New prop
+  onUpdate: (updatedProject: Project) => void;
 };
 
 export default function ProjectDetailsTab({
@@ -19,27 +18,24 @@ export default function ProjectDetailsTab({
 }: ProjectDetailsTabProps) {
   const supabase = createClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
-  // Form state, initialized with the project data
   const [name, setName] = useState(project.name);
   const [reference, setReference] = useState(project.reference || "");
   const [address, setAddress] = useState(project.location_address || "");
-  const [w3w, setW3w] = useState(project.location_what3words || "");
-  const [scope, setScope] = useState(project.scope || "");
-  const [author, setAuthor] = useState(project.author || "");
-  const [reviewer, setReviewer] = useState(project.reviewer || "");
+  const [costCode, setCostCode] = useState(project.cost_code || "");
+  const [clientContact, setClientContact] = useState(
+    project.client_contact || ""
+  );
   const [version, setVersion] = useState(project.version || "1.0");
   const [status, setStatus] = useState(project.document_status || "Draft");
 
-  // This hook keeps the form in sync if the parent data changes
   useEffect(() => {
     setName(project.name);
     setReference(project.reference || "");
     setAddress(project.location_address || "");
-    setW3w(project.location_what3words || "");
-    setScope(project.scope || "");
-    setAuthor(project.author || "");
-    setReviewer(project.reviewer || "");
+    setCostCode(project.cost_code || "");
+    setClientContact(project.client_contact || "");
     setVersion(project.version || "1.0");
     setStatus(project.document_status || "Draft");
   }, [project]);
@@ -54,10 +50,8 @@ export default function ProjectDetailsTab({
       version,
       document_status: status,
       location_address: address,
-      location_what3words: w3w,
-      scope,
-      author,
-      reviewer,
+      cost_code: costCode,
+      client_contact: clientContact,
       last_edited_at: new Date().toISOString(),
     };
 
@@ -72,155 +66,118 @@ export default function ProjectDetailsTab({
       toast.error(`Failed to save changes: ${error.message}`);
     } else if (updatedProject) {
       toast.success("Project details saved successfully!");
-      onUpdate(updatedProject); // Notify the parent page of the change
+      onUpdate(updatedProject);
+      setIsEditing(false);
     }
     setIsSubmitting(false);
   };
 
   return (
-    <form
-      onSubmit={handleSaveChanges}
-      className="space-y-6 bg-white p-8 rounded-lg shadow"
-    >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label htmlFor="projectName" className="block text-sm font-medium">
-            Project Name
-          </label>
-          <input
-            id="projectName"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            readOnly={!isCurrentUserAdmin}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm read-only:bg-gray-100"
-          />
-        </div>
-        <div>
-          <label htmlFor="projectRef" className="block text-sm font-medium">
-            Reference
-          </label>
-          <input
-            id="projectRef"
-            type="text"
-            value={reference}
-            onChange={(e) => setReference(e.target.value)}
-            readOnly={!isCurrentUserAdmin}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm read-only:bg-gray-100"
-          />
-        </div>
-        <div>
-          <label htmlFor="projectVersion" className="block text-sm font-medium">
-            Version
-          </label>
-          <input
-            id="projectVersion"
-            type="text"
-            value={version}
-            onChange={(e) => setVersion(e.target.value)}
-            readOnly={!isCurrentUserAdmin}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm read-only:bg-gray-100"
-          />
-        </div>
-        <div>
-          <label htmlFor="projectStatus" className="block text-sm font-medium">
-            Status
-          </label>
-          <select
-            id="projectStatus"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            disabled={!isCurrentUserAdmin}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm disabled:bg-gray-100"
-          >
-            <option>Draft</option>
-            <option>In Review</option>
-            <option>Approved</option>
-            <option>Archived</option>
-          </select>
-        </div>
-        <div>
-          <label htmlFor="projectAuthor" className="block text-sm font-medium">
-            Author
-          </label>
-          <input
-            id="projectAuthor"
-            type="text"
-            value={author}
-            onChange={(e) => setAuthor(e.target.value)}
-            readOnly={!isCurrentUserAdmin}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm read-only:bg-gray-100"
-          />
-        </div>
-        <div>
-          <label
-            htmlFor="projectReviewer"
-            className="block text-sm font-medium"
-          >
-            Reviewer
-          </label>
-          <input
-            id="projectReviewer"
-            type="text"
-            value={reviewer}
-            onChange={(e) => setReviewer(e.target.value)}
-            readOnly={!isCurrentUserAdmin}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm read-only:bg-gray-100"
-          />
-        </div>
-      </div>
-      <div>
-        <label htmlFor="projectAddress" className="block text-sm font-medium">
-          Site Address
-        </label>
-        <textarea
-          id="projectAddress"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          rows={3}
-          readOnly={!isCurrentUserAdmin}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm read-only:bg-gray-100"
-        />
-      </div>
-      <div>
-        <label htmlFor="projectW3W" className="block text-sm font-medium">
-          what3words Address
-        </label>
-        <input
-          id="projectW3W"
-          type="text"
-          value={w3w}
-          onChange={(e) => setW3w(e.target.value)}
-          readOnly={!isCurrentUserAdmin}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm read-only:bg-gray-100"
-        />
-      </div>
-      <div>
-        <label htmlFor="projectScope" className="block text-sm font-medium">
-          Scope of Work
-        </label>
-        <textarea
-          id="projectScope"
-          value={scope}
-          onChange={(e) => setScope(e.target.value)}
-          rows={5}
-          readOnly={!isCurrentUserAdmin}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm read-only:bg-gray-100"
-        />
-      </div>
-      {/* Only show the save button to admins */}
-      {isCurrentUserAdmin && (
-        <div className="flex justify-end pt-4">
+    <div className="bg-white p-6 rounded-lg shadow">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Project Details</h2>
+        {isCurrentUserAdmin && !isEditing && (
           <button
-            type="submit"
-            disabled={isSubmitting}
-            className="py-2 px-6 border rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
+            onClick={() => setIsEditing(true)}
+            className="text-sm font-medium text-blue-600 hover:text-blue-800"
           >
-            {isSubmitting ? "Saving..." : "Save Changes"}
+            Edit Details
           </button>
+        )}
+      </div>
+
+      <form onSubmit={handleSaveChanges} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium">Project Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              readOnly={!isEditing}
+              className="mt-1 block w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium">Reference</label>
+            <input
+              type="text"
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+              readOnly={!isEditing}
+              className="mt-1 block w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium">Cost Code</label>
+            <input
+              type="text"
+              value={costCode}
+              onChange={(e) => setCostCode(e.target.value)}
+              readOnly={!isEditing}
+              className="mt-1 block w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium">Client Contact</label>
+            <input
+              type="text"
+              value={clientContact}
+              onChange={(e) => setClientContact(e.target.value)}
+              readOnly={!isEditing}
+              className="mt-1 block w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium">Version</label>
+            <input
+              type="text"
+              value={version}
+              onChange={(e) => setVersion(e.target.value)}
+              readOnly={!isEditing}
+              className="mt-1 block w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium">Status</label>
+            <input
+              type="text"
+              value={status}
+              readOnly={true}
+              className="mt-1 block w-full bg-gray-100"
+            />
+          </div>
         </div>
-      )}
-    </form>
+        <div>
+          <label className="block text-sm font-medium">Site Address</label>
+          <textarea
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            readOnly={!isEditing}
+            rows={3}
+            className="mt-1 block w-full"
+          />
+        </div>
+
+        {isEditing && (
+          <div className="flex justify-end pt-4 space-x-2">
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              className="py-2 px-4 border rounded-md"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="py-2 px-4 border rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
+            >
+              {isSubmitting ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        )}
+      </form>
+    </div>
   );
 }
