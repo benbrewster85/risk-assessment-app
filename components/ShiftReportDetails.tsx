@@ -1,8 +1,7 @@
 "use client";
 
-import { EventLog } from "@/lib/types";
+import { EventLog, EventLogTask } from "@/lib/types";
 
-// A small helper component to format the linked items cleanly
 const LinkedItem = ({ name }: { name: string | null }) => (
   <span className="inline-block bg-blue-100 text-blue-800 text-xs font-medium mr-2 mb-2 px-2.5 py-0.5 rounded-full">
     {name}
@@ -35,47 +34,81 @@ export default function ShiftReportDetails({ log }: LogDetailsProps) {
     });
   };
 
-  // This component now directly uses the rich data passed into it from the parent modal
   const personnel = (log as any).personnel || [];
   const assets = (log as any).assets || [];
   const vehicles = (log as any).vehicles || [];
+  const tasks: EventLogTask[] = log.tasks || [];
 
   return (
     <dl className="sm:divide-y sm:divide-gray-200 text-sm">
       <DetailRow label="Project">{log.project?.name}</DetailRow>
       <DetailRow label="Start Time">{formatDateTime(log.start_time)}</DetailRow>
       <DetailRow label="End Time">{formatDateTime(log.end_time)}</DetailRow>
+
+      {tasks.length > 0 && (
+        <DetailRow label="Task Progress">
+          <div className="space-y-4">
+            {tasks
+              .filter((t: any) => t.task)
+              .map((t: any) => (
+                <div key={t.task_id} className="p-3 bg-slate-50 rounded-md">
+                  <p className="font-semibold text-gray-800">{t.task.title}</p>
+                  <div className="mt-2">
+                    <div className="flex justify-between text-xs font-medium text-gray-600 mb-1">
+                      <span>Progress during this shift:</span>
+                      <span>
+                        {t.progress_at_shift_start}% &rarr;{" "}
+                        {t.progress_on_report}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-4">
+                      <div
+                        className="bg-green-600 h-4 rounded-full"
+                        style={{
+                          width: `${t.progress_on_report}%`,
+                          backgroundImage: `linear-gradient(to right, #d1d5db ${t.progress_at_shift_start}%, #16a34a ${t.progress_at_shift_start}%)`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                  {t.notes && (
+                    <div className="mt-2">
+                      <p className="text-xs font-semibold text-gray-500">
+                        Notes for this task:
+                      </p>
+                      <p className="text-xs text-gray-700 p-2 bg-white border rounded-md mt-1 whitespace-pre-wrap">
+                        {t.notes}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+          </div>
+        </DetailRow>
+      )}
+
       <DetailRow label="Work Completed">
         <p className="whitespace-pre-wrap">
           {log.work_completed || "No details provided."}
         </p>
       </DetailRow>
       <DetailRow label="Personnel on Site">
-        {personnel.length > 0
-          ? personnel.map((p: any) => (
-              <LinkedItem key={p.id} name={`${p.first_name} ${p.last_name}`} />
-            ))
-          : "N/A"}
+        {personnel.map((p: any) => (
+          <LinkedItem key={p.id} name={`${p.first_name} ${p.last_name}`} />
+        ))}
       </DetailRow>
       <DetailRow label="Equipment Used">
-        {assets.length > 0
-          ? assets.map((a: any) => (
-              <LinkedItem key={a.id} name={`${a.system_id} (${a.model})`} />
-            ))
-          : "None"}
+        {assets.map((a: any) => (
+          <LinkedItem key={a.id} name={`${a.system_id} (${a.model})`} />
+        ))}
       </DetailRow>
       <DetailRow label="Vehicles Used">
-        {vehicles.length > 0
-          ? vehicles.map((v: any) => (
-              <LinkedItem key={v.id} name={`${v.registration_number}`} />
-            ))
-          : "None"}
+        {vehicles.map((v: any) => (
+          <LinkedItem key={v.id} name={`${v.registration_number}`} />
+        ))}
       </DetailRow>
       <DetailRow label="Notes">
         <p className="whitespace-pre-wrap">{log.notes || "No notes."}</p>
-      </DetailRow>
-      <DetailRow label="Submitted By">
-        {`${log.created_by?.first_name || ""} ${log.created_by?.last_name || ""}`.trim()}
       </DetailRow>
     </dl>
   );

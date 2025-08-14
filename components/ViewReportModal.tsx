@@ -2,10 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { EventLog, TeamMember, Asset, Vehicle } from "@/lib/types";
+import {
+  EventLog,
+  TeamMember,
+  Asset,
+  Vehicle,
+  EventLogTask,
+} from "@/lib/types";
 import Modal from "./Modal";
-import LostShiftReportDetails from "./LostShiftReportDetails";
 import ShiftReportDetails from "./ShiftReportDetails";
+import LostShiftReportDetails from "./LostShiftReportDetails";
 import IncidentReportDetails from "./IncidentReportDetails";
 
 type ViewReportModalProps = {
@@ -37,7 +43,7 @@ export default function ViewReportModal({
       setLoading(true);
 
       try {
-        // Step 1: Fetch the main report details
+        // Step 1: Fetch the main report details.
         const { data: reportData, error: reportError } = await supabase
           .from("event_logs")
           .select(
@@ -48,8 +54,8 @@ export default function ViewReportModal({
 
         if (reportError) throw reportError;
 
-        // Step 2: Fetch all linked data in parallel
-        const [personnelResult, assetsResult, vehiclesResult] =
+        // Step 2: Fetch all linked data in parallel using simple, direct queries.
+        const [personnelResult, assetsResult, vehiclesResult, tasksResult] =
           await Promise.all([
             supabase
               .from("event_log_personnel")
@@ -63,9 +69,13 @@ export default function ViewReportModal({
               .from("event_log_vehicles")
               .select("vehicle:vehicles(id, registration_number, model)")
               .eq("log_id", reportId),
+            supabase
+              .from("event_log_tasks")
+              .select("*, task:tasks(title)")
+              .eq("log_id", reportId),
           ]);
 
-        // Step 3: Combine all the data into a single object
+        // Step 3: Combine all the data into a single object for the UI.
         const fullReport: FullEventLog = {
           ...(reportData as EventLog),
           personnel:
@@ -75,6 +85,7 @@ export default function ViewReportModal({
           vehicles:
             vehiclesResult.data?.map((v: any) => v.vehicle).filter(Boolean) ||
             [],
+          tasks: (tasksResult.data as EventLogTask[]) || [],
         };
 
         setReport(fullReport);
@@ -96,12 +107,10 @@ export default function ViewReportModal({
         return <ShiftReportDetails log={report} />;
       case "Lost Shift Report":
         return <LostShiftReportDetails log={report} />;
-      case "Incident Report": // Add this case
+      case "Incident Report":
         return <IncidentReportDetails log={report} />;
       default:
-        return (
-          <p>This report type ({report.log_type}) cannot be displayed yet.</p>
-        );
+        return <p>Cannot display this report type.</p>;
     }
   };
 
