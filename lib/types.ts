@@ -1,9 +1,19 @@
 export type Project = {
-    id: string; name: string; reference: string | null; team_id: string;
-    location_address: string | null; brief_statement: string | null;
-    cost_code: string | null; client_contact: string | null;
-    project_manager_id: string | null; senior_engineer_id: string | null;
-    document_status: string | null; version: string | null; method_statement: string | null;
+    id: string;
+    team_id: string;
+    name: string;
+    reference: string | null;
+    cost_code: string | null;
+    client_contact: string | null;
+    document_status: string | null;
+    location_address: string | null;
+    brief_statement: string | null;
+    method_statement: string | null;
+    version: string | null;
+    project_manager_id: string | null;
+    project_manager_external_name: string | null;
+    site_lead_id: string | null;
+    site_lead_external_name: string | null;
 };
 export type ProjectListItem = { id: string; name: string; reference: string | null; last_edited_at: string; document_status: string | null;};
 export type Task = { id: string; project_id: string; team_id: string; title: string; description: string | null; status: 'Not Started' | 'In Progress' | 'Completed'; progress: number; sort_order: number; created_at: string; };
