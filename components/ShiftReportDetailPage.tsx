@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ShiftReport } from "@/lib/types";
+import { EventLog } from "@/lib/types";
 import Link from "next/link";
 
 type ShiftReportDetailPageProps = {
-  initialReport: ShiftReport;
+  initialReport: EventLog;
   fromProjectId?: string; // Optional prop to handle the back link
 };
 
