@@ -61,3 +61,21 @@ export type AssetActivityLog = {
 export type VehicleActivityLog = {
     event_log: EventLog | null;
 };
+
+export type ReportSignatory = {
+    profiles: {
+        first_name: string | null;
+        last_name: string | null;
+        role: string;
+        id: string;
+    } | null;
+};
+
+export type ReportSignature = {
+    signed_at: string;
+    profiles: {
+        first_name: string | null;
+        last_name: string | null;
+        id: string;
+    } | null;
+};
