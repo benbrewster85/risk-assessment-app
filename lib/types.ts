@@ -14,6 +14,7 @@ export type Project = {
     project_manager_external_name: string | null;
     site_lead_id: string | null;
     site_lead_external_name: string | null;
+    job_description: string | null;
 };
 export type ProjectListItem = { id: string; name: string; reference: string | null; last_edited_at: string; document_status: string | null;};
 export type Task = { id: string; project_id: string; team_id: string; title: string; description: string | null; status: 'Not Started' | 'In Progress' | 'Completed'; progress: number; sort_order: number; created_at: string; };
@@ -24,7 +25,17 @@ export type RaEntry = { id: number; task_description: string | null; hazard_id: 
 export type Team = { id: string; name: string; logo_url: string | null; };
 export type Signatory = { user_id: string; };
 export type Signature = { user_id: string; signed_at: string; };
-export type AssetCategory = { id: string; name: string; owner_id: string | null; owner: { first_name: string | null; last_name: string | null; } | null; };
+
+export type AssetCategory = {
+    id: string;
+    name: string;
+    owner_id: string | null;
+    asset_category_class: string | null;
+    owner: {
+        first_name: string | null;
+        last_name: string | null;
+    } | null;
+};
 export type Asset = { id: string; system_id: string; team_id: string; manufacturer: string | null; model: string | null; serial_number: string | null; status: string | null; status_id: string | null; created_at: string; category_id: string | null; current_assignee_id: string | null; parent_asset_id: string | null; last_calibrated_date: string | null; calibration_cycle_months: number | null; category_name: string | null; assignee_first_name: string | null; assignee_last_name: string | null; parent_assignee_first_name: string | null; parent_assignee_last_name: string | null; };
 export type AssetIssue = { id: string; asset_id: string; created_at: string; log_notes: string; log_type: string; event_date: string | null; status: string; resolution_notes: string | null; resolved_at: string | null; reporter: { first_name: string | null; last_name: string | null; } | null; resolver: { first_name: string | null; last_name: string | null; } | null; photos: { id: string; file_path: string; }[]; asset?: { system_id: string; } | null; };
 export type Vehicle = { id: string; team_id: string; registration_number: string; manufacturer: string | null; model: string | null; owner_id: string | null; current_assignee_id: string | null; last_serviced_date: string | null; service_cycle_months: number; mot_due_date: string | null; created_at: string; };
@@ -89,3 +100,54 @@ export type ReportSignature = {
         id: string;
     } | null;
 };
+
+// Add these to the bottom of lib/types.ts
+
+export type ResourceType = 'personnel' | 'equipment' | 'vehicles' | 'all';
+export type ShiftType = 'day' | 'night';
+export type ShiftView = 'all' | 'day' | 'night';
+
+export interface WorkItem {
+  id: string;
+  name: string;
+  // Make sure 'absence' is included here
+  type: 'project' | 'equipment' | 'vehicle' | 'personnel' | 'absence';
+  color: string;
+  duration?: number;
+}
+
+export interface Assignment {
+  id: string;
+  workItemId: string;
+  resourceId: string;
+  date: string;
+  shift: ShiftType;
+  // Make sure 'absence' is included here
+  assignmentType: 'project' | 'equipment' | 'vehicle' | 'absence';
+  duration?: number;
+}
+
+export interface Resource {
+  id: string;
+  name: string;
+  type: ResourceType;
+  avatar?: string;
+}
+
+
+
+export interface SchedulerNote {
+  id: string;
+  resourceId: string;
+  date: string;
+  shift: ShiftType;
+  text: string;
+}
+
+export interface DayEvent {
+  id: string;
+  date: string; // Format: YYYY-MM-DD
+  text: string;
+  type: 'holiday' | 'event' | 'blocker';
+  color: string;
+}
