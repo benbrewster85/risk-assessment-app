@@ -66,10 +66,13 @@ const mockWorkItems: WorkItem[] = [
 const mockResources: Resource[] = [
   { id: "person-1", name: "Fred Flintstone", type: "personnel" },
   { id: "person-2", name: "Bart Simpson", type: "personnel" },
+  { id: "person-3", name: "Peter Griffin", type: "personnel" },
   { id: "equip-1", name: "GNSS 001", type: "equipment" },
+  { id: "equip-3", name: "RTC360 001", type: "equipment" },
   { id: "vehicle-1", name: "Renault Kangoo 1", type: "vehicles" },
+  { id: "vehicle-3", name: "Ford Transit 2", type: "vehicles" },
   { id: "vehicle-A", name: "Ford Transit 1", type: "vehicles" },
-  { id: "equip-2", name: "Total Station 2", type: "equipment" }, // Fixed duplicate ID
+  { id: "equip-2", name: "Total Station 2", type: "equipment" },
 ];
 // END MOCK DATA
 
