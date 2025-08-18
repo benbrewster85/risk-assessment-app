@@ -57,19 +57,19 @@ const mockWorkItems: WorkItem[] = [
   },
   {
     id: "project-2",
-    name: "Equipment Maintenance",
+    name: "Track Survey",
     type: "project",
     color: "bg-orange-600",
   },
 ];
 
 const mockResources: Resource[] = [
-  { id: "person-1", name: "John Smith", type: "personnel" },
-  { id: "person-2", name: "Sarah Johnson", type: "personnel" },
-  { id: "equip-1", name: "Excavator A", type: "equipment" },
-  { id: "vehicle-1", name: "Truck 001", type: "vehicles" },
+  { id: "person-1", name: "Fred Flintstone", type: "personnel" },
+  { id: "person-2", name: "Bart Simpson", type: "personnel" },
+  { id: "equip-1", name: "GNSS 001", type: "equipment" },
+  { id: "vehicle-1", name: "Renault Kangoo 1", type: "vehicles" },
   { id: "vehicle-A", name: "Ford Transit 1", type: "vehicles" },
-  { id: "asset-A", name: "Total Station 2", type: "equipment" }, // Fixed duplicate ID
+  { id: "equip-2", name: "Total Station 2", type: "equipment" }, // Fixed duplicate ID
 ];
 // END MOCK DATA
 
