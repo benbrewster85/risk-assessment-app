@@ -14,7 +14,7 @@ import {
 
 const navLinks = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
-  { name: "Scheduler", href: "#", icon: Calendar, status: "coming_soon" }, // Updated this line
+  { name: "Scheduler", href: "/dashboard/scheduler", icon: Calendar },
   { name: "Projects", href: "/dashboard/projects", icon: Folder },
   { name: "Logs & Records", href: "/dashboard/logs", icon: FileText },
   { name: "Asset Management", href: "/dashboard/assets", icon: HardDrive },

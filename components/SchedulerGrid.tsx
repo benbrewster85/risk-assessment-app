@@ -16,8 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import { Sun, Moon, Users, Truck, Wrench, Plus } from "lucide-react";
 import { NoteCard } from "./NoteCard";
 import { DayEventManager } from "./DayEventManager";
+import { DraggableAssignment } from "./DraggableAssignment";
 
-// --- PROPS INTERFACE ---
+// Helper function to calculate the week of the year
 const getWeekOfYear = (date: Date): number => {
   const startOfYear = new Date(date.getFullYear(), 0, 1);
   const diff = date.getTime() - startOfYear.getTime();
@@ -26,6 +27,13 @@ const getWeekOfYear = (date: Date): number => {
   return Math.ceil(dayOfYear / 7);
 };
 
+// Helper function to check for weekends
+const isWeekend = (date: Date): boolean => {
+  const day = date.getDay();
+  return day === 0 || day === 6; // 0 = Sunday, 6 = Saturday
+};
+
+// --- PROPS INTERFACE ---
 interface SchedulerGridProps {
   dates: Date[];
   resources: Resource[];
@@ -35,18 +43,20 @@ interface SchedulerGridProps {
   shiftView: ShiftView;
   viewType: ResourceType;
   dayEvents: DayEvent[];
-  onAddDayEvent: (date: string, text: string, type: DayEvent["type"]) => void;
-  onDeleteDayEvent: (eventId: string) => void;
   onDrop: (
-    resourceId: string,
-    date: string,
-    shift: ShiftType,
-    item: WorkItem
+    item: WorkItem | Assignment,
+    type: string | symbol | null,
+    targetResourceId: string,
+    targetDate: string,
+    targetShift: ShiftType
   ) => void;
   onRemoveAssignment: (assignmentId: string) => void;
   onAddNote: (resourceId: string, date: string, shift: ShiftType) => void;
   onUpdateNote: (noteId: string, newText: string) => void;
   onDeleteNote: (noteId: string) => void;
+  onAddDayEvent: (date: string, text: string, type: DayEvent["type"]) => void;
+  onDeleteDayEvent: (eventId: string) => void;
+  isReadOnly: boolean;
 }
 
 interface DroppableCellProps {
@@ -54,10 +64,11 @@ interface DroppableCellProps {
   date: string;
   shift: ShiftType;
   onDrop: (
-    resourceId: string,
-    date: string,
-    shift: ShiftType,
-    item: WorkItem
+    item: WorkItem | Assignment,
+    type: string | symbol | null,
+    targetResourceId: string,
+    targetDate: string,
+    targetShift: ShiftType
   ) => void;
   onAddNote: () => void;
   children: React.ReactNode;
@@ -71,10 +82,21 @@ const DroppableCell = ({
   resourceId,
   date,
   shift,
-}: DroppableCellProps) => {
+  isReadOnly,
+}: DroppableCellProps & { isReadOnly: boolean }) => {
   const [{ isOver }, drop] = useDrop(() => ({
-    accept: "WORK_ITEM",
-    drop: (item: WorkItem) => onDrop(resourceId, date, shift, item),
+    accept: ["WORK_ITEM", "ASSIGNMENT_CARD"], // Accept both types
+    drop: (item, monitor) => {
+      // Call the unified handler with all the necessary info
+      onDrop(
+        item as Assignment | WorkItem,
+        monitor.getItemType(),
+        resourceId,
+        date,
+        shift
+      );
+    },
+    canDrop: () => !isReadOnly,
     collect: (monitor: DropTargetMonitor) => ({ isOver: !!monitor.isOver() }),
   }));
 
@@ -111,6 +133,7 @@ export function SchedulerGrid({
   onDeleteNote,
   onAddDayEvent,
   onDeleteDayEvent,
+  isReadOnly,
 }: SchedulerGridProps) {
   const gridTemplateColumns = `200px repeat(${dates.length}, minmax(120px, 1fr))`;
   const rowCount =
@@ -118,7 +141,8 @@ export function SchedulerGrid({
   const gridTemplateRows = `auto repeat(${rowCount}, minmax(48px, auto))`;
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-auto">
+    // FIX: Added `relative` class to establish a firm positioning context for sticky elements
+    <div className="relative bg-white rounded-lg shadow overflow-x-auto">
       <div className="grid" style={{ gridTemplateColumns, gridTemplateRows }}>
         {/* === HEADER ROW === */}
         <div className="sticky top-0 left-0 z-30 bg-gray-50 border-b border-r border-gray-200 p-2 font-semibold text-sm text-gray-600 flex items-center justify-center">
@@ -127,10 +151,8 @@ export function SchedulerGrid({
         {dates.map((date) => {
           const dateString = date.toISOString().split("T")[0];
           const eventsForDay = dayEvents.filter((e) => e.date === dateString);
-          const isWeekend = date.getDay() === 0 || date.getDay() === 6;
 
-          // NEW: Determine background color based on events, with holidays taking precedence
-          let columnBgClass = isWeekend ? "bg-slate-100" : "bg-gray-50"; // Default to weekend or weekday color
+          let columnBgClass = isWeekend(date) ? "bg-slate-100" : "bg-gray-50";
           if (eventsForDay.some((e) => e.type === "event"))
             columnBgClass = "bg-blue-50";
           if (eventsForDay.some((e) => e.type === "holiday"))
@@ -182,11 +204,54 @@ export function SchedulerGrid({
           const gridRowStart =
             2 + (shiftView === "all" ? resourceIndex * 2 : resourceIndex);
 
+          // Replace the existing renderCellContent function with this one
           const renderCellContent = (
             shift: ShiftType,
             dateString: string,
             resource: Resource
           ) => {
+            // This block will log debug info for the first resource in your list to avoid spamming the console
+            if (
+              resources.length > 0 &&
+              resource.id === resources[0].id &&
+              shift === "day"
+            ) {
+              console.groupCollapsed(
+                `--- Debugging Cell: ${resource.name} / ${dateString} ---`
+              );
+
+              // Log the first assignment from the master list to see its format
+              if (assignments.length > 0) {
+                console.log(
+                  "Data format of first assignment from database:",
+                  assignments[0]
+                );
+              }
+
+              console.log("This cell is looking for values matching:", {
+                resourceId: resource.id,
+                date: dateString,
+                shift: shift,
+              });
+
+              // Log the result of each comparison for the first assignment
+              if (assignments.length > 0) {
+                const a = assignments[0];
+                console.log(`Comparing with assignment ${a.id}:`);
+                console.log(
+                  `  - Shift Test: '${a.shift}' === '${shift}'  -->  ${a.shift === shift}`
+                );
+                console.log(
+                  `  - Date Test:  '${a.date}' === '${dateString}'  -->  ${a.date === dateString}`
+                );
+                console.log(
+                  `  - Resource Test (for personnel view): '${a.resourceId}' === '${resource.id}'  -->  ${a.resourceId === resource.id}`
+                );
+              }
+
+              console.groupEnd();
+            }
+
             return (
               <>
                 {assignments
@@ -240,7 +305,6 @@ export function SchedulerGrid({
 
           return (
             <React.Fragment key={resource.id}>
-              {/* FIX 2: Added z-20 to ensure this column sits on top of scrolling cells */}
               <div
                 className="sticky left-0 z-20 bg-white border-r border-b border-gray-200 p-2 font-medium text-sm flex items-center"
                 style={{ gridRow: `${gridRowStart} / span ${rowSpan}` }}
@@ -263,10 +327,8 @@ export function SchedulerGrid({
                   const eventsForDay = dayEvents.filter(
                     (e) => e.date === dateString
                   );
-                  const isWeekend = date.getDay() === 0 || date.getDay() === 6;
 
-                  // NEW: Determine background color for the data cell
-                  let columnBgClass = isWeekend ? "bg-slate-100" : "";
+                  let columnBgClass = isWeekend(date) ? "bg-slate-100" : "";
                   if (eventsForDay.some((e) => e.type === "event"))
                     columnBgClass = "bg-blue-50";
                   if (eventsForDay.some((e) => e.type === "holiday"))
@@ -285,6 +347,7 @@ export function SchedulerGrid({
                         onAddNote={() =>
                           onAddNote(resource.id, dateString, "day")
                         }
+                        isReadOnly={isReadOnly}
                       >
                         <Sun className="w-3 h-3 text-yellow-500 mr-1 opacity-50" />
                         {renderCellContent("day", dateString, resource)}
@@ -299,10 +362,8 @@ export function SchedulerGrid({
                   const eventsForDay = dayEvents.filter(
                     (e) => e.date === dateString
                   );
-                  const isWeekend = date.getDay() === 0 || date.getDay() === 6;
 
-                  // NEW: Determine background color for the data cell
-                  let columnBgClass = isWeekend ? "bg-slate-100" : "";
+                  let columnBgClass = isWeekend(date) ? "bg-slate-100" : "";
                   if (eventsForDay.some((e) => e.type === "event"))
                     columnBgClass = "bg-blue-50";
                   if (eventsForDay.some((e) => e.type === "holiday"))
@@ -316,11 +377,12 @@ export function SchedulerGrid({
                       <DroppableCell
                         resourceId={resource.id}
                         date={dateString}
-                        shift="night"
+                        shift="day"
                         onDrop={onDrop}
                         onAddNote={() =>
-                          onAddNote(resource.id, dateString, "night")
+                          onAddNote(resource.id, dateString, "day")
                         }
+                        isReadOnly={isReadOnly}
                       >
                         <Moon className="w-3 h-3 text-indigo-500 mr-1 opacity-50" />
                         {renderCellContent("night", dateString, resource)}
