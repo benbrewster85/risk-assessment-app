@@ -10,11 +10,21 @@ import {
   Users,
   FileText,
   Calendar,
+  Icon,
 } from "react-feather";
 
-const navLinks = [
+// 1. Define a type for your navigation links
+type NavLink = {
+  name: string;
+  href: string;
+  icon: Icon;
+  status?: "coming_soon"; // The '?' makes this property optional
+};
+
+// 2. Apply the new type to your navLinks array
+const navLinks: NavLink[] = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
-  { name: "Scheduler", href: "/dashboard/scheduler", icon: Calendar },
+  { name: "Scheduler", href: "/dashboard/scheduler", icon: Calendar }, // This link was updated in a previous step
   { name: "Projects", href: "/dashboard/projects", icon: Folder },
   { name: "Logs & Records", href: "/dashboard/logs", icon: FileText },
   { name: "Asset Management", href: "/dashboard/assets", icon: HardDrive },
