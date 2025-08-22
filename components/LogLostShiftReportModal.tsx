@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-hot-toast";
 import Modal from "./Modal";
 import FormField from "./FormField";
 import { ProjectListItem, TeamMember } from "@/lib/types";
+import Select, { OnChangeValue } from "react-select";
+
+type OptionType = { value: string; label: string };
 
 type LogLostShiftReportModalProps = {
   isOpen: boolean;
@@ -29,18 +32,28 @@ export default function LogLostShiftReportModal({
   const supabase = createClient();
   const [projectId, setProjectId] = useState("");
   const [shiftDate, setShiftDate] = useState("");
-  const [personnel, setPersonnel] = useState<string[]>([]);
+  const [personnel, setPersonnel] = useState<readonly OptionType[]>([]);
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const memberOptions = useMemo(
+    () =>
+      teamMembers.map((m) => ({
+        value: m.id,
+        label: `${m.first_name || ""} ${m.last_name || ""}`.trim(),
+      })),
+    [teamMembers]
+  );
 
   useEffect(() => {
     if (isOpen) {
       setProjectId(projects[0]?.id || "");
       setShiftDate(new Date().toISOString().split("T")[0]);
-      setPersonnel([userId]);
+      const currentUserOption = memberOptions.find((m) => m.value === userId);
+      setPersonnel(currentUserOption ? [currentUserOption] : []);
       setReason("");
     }
-  }, [isOpen, projects, userId]);
+  }, [isOpen, projects, userId, memberOptions]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,17 +69,14 @@ export default function LogLostShiftReportModal({
         project_id: projectId,
         created_by_id: userId,
         log_type: "Lost Shift Report",
-        // For a lost shift, start_time can represent the date it was meant to happen
         start_time: new Date(shiftDate).toISOString(),
-        // All unique data goes into the flexible log_data field
         log_data: {
           reason_for_loss: reason,
-          personnel_ids: personnel,
+          personnel_ids: personnel.map((p) => p.value),
         },
       });
 
       if (error) throw error;
-
       toast.success("Lost Shift Report created successfully!");
       onSuccess();
       onClose();
@@ -81,55 +91,56 @@ export default function LogLostShiftReportModal({
 
   return (
     <Modal title="Create Lost Shift Report" isOpen={isOpen} onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <FormField label="Project">
-          <select
-            value={projectId}
-            onChange={(e) => setProjectId(e.target.value)}
-            required
-          >
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </FormField>
-        <FormField label="Date of Lost Shift">
-          <input
-            type="date"
-            value={shiftDate}
-            onChange={(e) => setShiftDate(e.target.value)}
-            required
-          />
-        </FormField>
-        <FormField label="Personnel Involved">
-          <select
-            multiple
-            value={personnel}
-            onChange={(e) =>
-              setPersonnel(
-                Array.from(e.target.selectedOptions, (option) => option.value)
-              )
-            }
-            className="h-32"
-          >
-            {teamMembers.map((m) => (
-              <option
-                key={m.id}
-                value={m.id}
-              >{`${m.first_name} ${m.last_name}`}</option>
-            ))}
-          </select>
-        </FormField>
-        <FormField label="Reason for Loss of Shift">
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            rows={5}
-            required
-          />
-        </FormField>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="p-4 border rounded-md space-y-4">
+          <h3 className="text-lg font-semibold mb-3">Core Details</h3>
+          <FormField label="Project">
+            <select
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              required
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+            >
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Date of Lost Shift">
+            <input
+              type="date"
+              value={shiftDate}
+              onChange={(e) => setShiftDate(e.target.value)}
+              required
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+            />
+          </FormField>
+        </div>
+
+        <div className="p-4 border rounded-md space-y-4">
+          <h3 className="text-lg font-semibold mb-3">Personnel & Reason</h3>
+          <FormField label="Personnel Involved">
+            <Select
+              isMulti
+              value={personnel}
+              onChange={(selected) =>
+                setPersonnel(selected as OnChangeValue<OptionType, true>)
+              }
+              options={memberOptions}
+            />
+          </FormField>
+          <FormField label="Reason for Loss of Shift">
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={5}
+              required
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+            />
+          </FormField>
+        </div>
 
         <div className="flex justify-end pt-2">
           <button

@@ -154,7 +154,6 @@ export default function SchedulerPage() {
     // 2. Call the database
     try {
       await createDayEvent(newEvent, teamId);
-      toast.success("Event added.");
       router.refresh(); // Refresh to sync data with the server
     } catch (error) {
       toast.error("Failed to add event.");
@@ -171,7 +170,6 @@ export default function SchedulerPage() {
     // 2. Call the database
     try {
       await deleteDayEvent(eventId);
-      toast.success("Event deleted.");
     } catch (error) {
       toast.error("Failed to delete event.");
       // 3. Revert on failure
@@ -236,7 +234,6 @@ export default function SchedulerPage() {
         // ------------------------------------
 
         setNotes((prev) => prev.map((n) => (n.id === noteId ? savedNote : n)));
-        toast.success("Note saved.");
         router.refresh();
       } catch (error) {
         console.error("Failed to save note:", error); // Log the actual error
@@ -412,7 +409,6 @@ export default function SchedulerPage() {
       try {
         if (!teamId) throw new Error("Team ID not found");
         await createAssignment(optimisticAssignment, teamId);
-        toast.success("Assignment created.");
 
         // 3. Refresh server data to get the real ID and sync state
         router.refresh();
@@ -434,7 +430,6 @@ export default function SchedulerPage() {
     // Step 2: Call the database to delete the record
     try {
       await deleteAssignment(assignmentId);
-      toast.success("Assignment removed.");
     } catch (error) {
       console.error("Failed to delete assignment:", error);
       toast.error("Failed to remove assignment.");
@@ -627,20 +622,6 @@ export default function SchedulerPage() {
                         />
                       )
                     )}
-                </div>
-                <div className="flex flex-wrap gap-2 items-center">
-                  {Object.entries(groupedItems).map(([type, items]) => (
-                    <ToolboxPopover
-                      key={type}
-                      title={type}
-                      items={items}
-                      trigger={
-                        <Button variant="outline" size="sm">
-                          {type}
-                        </Button>
-                      }
-                    />
-                  ))}
                 </div>
               </div>
               <div>

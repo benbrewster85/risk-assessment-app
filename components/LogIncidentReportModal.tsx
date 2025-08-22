@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-hot-toast";
 import Modal from "./Modal";
 import FormField from "./FormField";
 import { ProjectListItem, TeamMember } from "@/lib/types";
+import Select, { OnChangeValue } from "react-select";
+
+type OptionType = { value: string; label: string };
 
 type LogIncidentReportModalProps = {
   isOpen: boolean;
@@ -31,22 +34,34 @@ export default function LogIncidentReportModal({
   teamId,
   userId,
   projects,
+  teamMembers,
 }: LogIncidentReportModalProps) {
   const supabase = createClient();
   const [projectId, setProjectId] = useState("");
   const [incidentTime, setIncidentTime] = useState("");
   const [severity, setSeverity] = useState("Near Miss");
-  const [peopleInvolved, setPeopleInvolved] = useState("");
+  const [peopleInvolved, setPeopleInvolved] = useState<readonly OptionType[]>(
+    []
+  );
   const [description, setDescription] = useState("");
   const [actionTaken, setActionTaken] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const memberOptions = useMemo(
+    () =>
+      teamMembers.map((m) => ({
+        value: m.id,
+        label: `${m.first_name || ""} ${m.last_name || ""}`.trim(),
+      })),
+    [teamMembers]
+  );
 
   useEffect(() => {
     if (isOpen) {
       setProjectId(projects[0]?.id || "");
       setIncidentTime(new Date().toISOString().substring(0, 16));
       setSeverity("Near Miss");
-      setPeopleInvolved("");
+      setPeopleInvolved([]);
       setDescription("");
       setActionTaken("");
     }
@@ -64,7 +79,7 @@ export default function LogIncidentReportModal({
         start_time: incidentTime,
         log_data: {
           severity,
-          people_involved: peopleInvolved,
+          people_involved_ids: peopleInvolved.map((p) => p.value),
           description,
           action_taken: actionTaken,
         },
@@ -85,66 +100,82 @@ export default function LogIncidentReportModal({
 
   return (
     <Modal title="Create Incident Report" isOpen={isOpen} onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <FormField label="Project">
-          <select
-            value={projectId}
-            onChange={(e) => setProjectId(e.target.value)}
-            required
-          >
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </FormField>
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label="Time of Incident">
-            <input
-              type="datetime-local"
-              value={incidentTime}
-              onChange={(e) => setIncidentTime(e.target.value)}
-              required
-            />
-          </FormField>
-          <FormField label="Severity Level">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="p-4 border rounded-md space-y-4">
+          <h3 className="text-lg font-semibold mb-3">Incident Details</h3>
+          <FormField label="Project">
             <select
-              value={severity}
-              onChange={(e) => setSeverity(e.target.value)}
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              required
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
             >
-              {severityLevels.map((level) => (
-                <option key={level} value={level}>
-                  {level}
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
                 </option>
               ))}
             </select>
           </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Time of Incident">
+              <input
+                type="datetime-local"
+                value={incidentTime}
+                onChange={(e) => setIncidentTime(e.target.value)}
+                required
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+              />
+            </FormField>
+            <FormField label="Severity Level">
+              <select
+                value={severity}
+                onChange={(e) => setSeverity(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+              >
+                {severityLevels.map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          </div>
+          <FormField label="People Involved">
+            <Select
+              isMulti
+              value={peopleInvolved}
+              onChange={(selected) =>
+                setPeopleInvolved(selected as OnChangeValue<OptionType, true>)
+              }
+              options={memberOptions}
+              placeholder="Select team members..."
+            />
+          </FormField>
         </div>
-        <FormField label="People Involved (Names)">
-          <input
-            type="text"
-            value={peopleInvolved}
-            onChange={(e) => setPeopleInvolved(e.target.value)}
-            placeholder="e.g., John Doe, Jane Smith"
-          />
-        </FormField>
-        <FormField label="Description of Incident">
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={5}
-            required
-          />
-        </FormField>
-        <FormField label="Immediate Action Taken">
-          <textarea
-            value={actionTaken}
-            onChange={(e) => setActionTaken(e.target.value)}
-            rows={3}
-            required
-          />
-        </FormField>
+
+        <div className="p-4 border rounded-md space-y-4">
+          <h3 className="text-lg font-semibold mb-3">Description & Actions</h3>
+          <FormField label="Description of Incident">
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={5}
+              required
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+            />
+          </FormField>
+          <FormField label="Immediate Action Taken">
+            <textarea
+              value={actionTaken}
+              onChange={(e) => setActionTaken(e.target.value)}
+              rows={3}
+              required
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+            />
+          </FormField>
+        </div>
+
         <div className="flex justify-end pt-2">
           <button
             type="button"

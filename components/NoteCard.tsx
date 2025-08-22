@@ -11,14 +11,19 @@ interface NoteCardProps {
   note: SchedulerNote;
   onUpdate: (noteId: string, newText: string) => void;
   onDelete: (noteId: string) => void;
+  isReadOnly: boolean; // <-- Add isReadOnly prop
 }
 
-export function NoteCard({ note, onUpdate, onDelete }: NoteCardProps) {
-  const [isEditing, setIsEditing] = useState(note.text === "");
+export function NoteCard({
+  note,
+  onUpdate,
+  onDelete,
+  isReadOnly,
+}: NoteCardProps) {
+  const [isEditing, setIsEditing] = useState(note.text === "" && !isReadOnly);
   const [text, setText] = useState(note.text);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-resize the textarea
   useEffect(() => {
     if (isEditing && textAreaRef.current) {
       textAreaRef.current.style.height = "auto";
@@ -29,7 +34,7 @@ export function NoteCard({ note, onUpdate, onDelete }: NoteCardProps) {
 
   const handleSave = () => {
     if (text.trim() === "") {
-      onDelete(note.id); // Delete the note if it's empty
+      onDelete(note.id);
     } else {
       onUpdate(note.id, text);
     }
@@ -74,8 +79,9 @@ export function NoteCard({ note, onUpdate, onDelete }: NoteCardProps) {
   return (
     <Badge
       variant="outline"
-      className="bg-gray-200 text-gray-700 h-auto whitespace-normal cursor-pointer w-full text-left justify-start"
-      onClick={() => setIsEditing(true)}
+      className={`bg-gray-200 text-gray-700 h-auto whitespace-normal w-full text-left justify-start ${isReadOnly ? "cursor-default" : "cursor-pointer"}`}
+      // Disable opening the editor if read-only
+      onClick={isReadOnly ? undefined : () => setIsEditing(true)}
     >
       <p className="truncate">{note.text}</p>
     </Badge>

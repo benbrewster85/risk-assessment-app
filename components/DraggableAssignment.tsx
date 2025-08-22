@@ -6,22 +6,25 @@ import { getEmptyImage } from "react-dnd-html5-backend";
 import { Badge } from "@/components/ui/badge";
 import { Assignment, WorkItem } from "@/lib/types";
 
-// 1. Add onRemoveAssignment to the props interface
+// 1. Add `isReadOnly` to the props
 interface DraggableAssignmentProps {
   assignment: Assignment;
   itemToDisplay: WorkItem;
   onRemoveAssignment: (assignmentId: string) => void;
+  isReadOnly: boolean;
 }
 
 export function DraggableAssignment({
   assignment,
   itemToDisplay,
   onRemoveAssignment,
+  isReadOnly,
 }: DraggableAssignmentProps) {
-  // 2. Receive the new prop
   const [{ isDragging }, drag, preview] = useDrag(() => ({
     type: "ASSIGNMENT_CARD",
     item: assignment,
+    // 2. Use the `canDrag` property to disable dragging
+    canDrag: () => !isReadOnly,
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging(),
     }),
@@ -35,9 +38,12 @@ export function DraggableAssignment({
     <div ref={drag as any} style={{ opacity: isDragging ? 0.5 : 1 }}>
       <Badge
         variant="secondary"
-        // 3. Add the onClick handler and update the cursor
-        onClick={() => onRemoveAssignment(assignment.id)}
-        className={`${itemToDisplay.color} text-white cursor-grab active:cursor-grabbing hover:opacity-80 transition-opacity`}
+        // 3. Make the onClick handler conditional
+        onClick={
+          isReadOnly ? undefined : () => onRemoveAssignment(assignment.id)
+        }
+        // 4. Make the cursor style conditional
+        className={`${itemToDisplay.color} text-white transition-opacity ${isReadOnly ? "cursor-default" : "cursor-grab active:cursor-grabbing hover:opacity-80"}`}
       >
         {itemToDisplay.name}
       </Badge>

@@ -37,7 +37,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     notFound();
   }
 
-  // Fetch all of the project's related data in parallel
+  // This block now contains all the correct queries for every tab
   const [
     raResult,
     dynamicRisksResult,
@@ -55,9 +55,9 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       .eq("project_id", projectId)
       .order("logged_at", { ascending: false }),
     supabase
-      .from("shift_reports")
+      .from("event_logs")
       .select(
-        "*, created_by:profiles(first_name, last_name), project:projects(name)"
+        "*, created_by:profiles(first_name, last_name, id), project:projects(id, name)"
       )
       .eq("project_id", projectId)
       .order("start_time", { ascending: false }),
@@ -66,7 +66,6 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       .select("*")
       .eq("project_id", projectId)
       .order("sort_order"),
-    // This new query fetches all team members
     supabase
       .from("profiles")
       .select("id, first_name, last_name, role")
@@ -87,7 +86,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       initialDynamicRisks={(dynamicRisksResult.data as DynamicRisk[]) || []}
       initialShiftReports={(shiftReportsResult.data as EventLog[]) || []}
       initialTasks={(tasksResult.data as Task[]) || []}
-      teamMembers={(teamMembersResult.data as TeamMember[]) || []} // Pass team members to the client
+      teamMembers={(teamMembersResult.data as TeamMember[]) || []}
       currentUserId={user.id}
       currentUserRole={currentUserRole}
     />

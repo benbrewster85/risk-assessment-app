@@ -43,6 +43,7 @@ interface SchedulerGridProps {
   shiftView: ShiftView;
   viewType: ResourceType;
   dayEvents: DayEvent[];
+  isReadOnly: boolean;
   onDrop: (
     item: WorkItem | Assignment,
     type: string | symbol | null,
@@ -56,7 +57,6 @@ interface SchedulerGridProps {
   onDeleteNote: (noteId: string) => void;
   onAddDayEvent: (date: string, text: string, type: DayEvent["type"]) => void;
   onDeleteDayEvent: (eventId: string) => void;
-  isReadOnly: boolean;
 }
 
 interface DroppableCellProps {
@@ -72,6 +72,7 @@ interface DroppableCellProps {
   ) => void;
   onAddNote: () => void;
   children: React.ReactNode;
+  isReadOnly: boolean;
 }
 
 // --- DROPPABLE CELL COMPONENT ---
@@ -83,18 +84,11 @@ const DroppableCell = ({
   date,
   shift,
   isReadOnly,
-}: DroppableCellProps & { isReadOnly: boolean }) => {
+}: DroppableCellProps) => {
   const [{ isOver }, drop] = useDrop(() => ({
-    accept: ["WORK_ITEM", "ASSIGNMENT_CARD"], // Accept both types
-    drop: (item, monitor) => {
-      // Call the unified handler with all the necessary info
-      onDrop(
-        item as Assignment | WorkItem,
-        monitor.getItemType(),
-        resourceId,
-        date,
-        shift
-      );
+    accept: ["WORK_ITEM", "ASSIGNMENT_CARD"],
+    drop: (item: WorkItem | Assignment, monitor) => {
+      onDrop(item, monitor.getItemType(), resourceId, date, shift);
     },
     canDrop: () => !isReadOnly,
     collect: (monitor: DropTargetMonitor) => ({ isOver: !!monitor.isOver() }),
@@ -106,12 +100,14 @@ const DroppableCell = ({
       className={`relative group h-full p-1 flex flex-wrap gap-1 items-start content-start transition-colors ${isOver ? "bg-blue-100" : ""}`}
     >
       {children}
-      <button
-        onClick={onAddNote}
-        className="absolute top-0 right-0 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-      >
-        <Plus className="h-3 w-3 text-gray-400" />
-      </button>
+      {!isReadOnly && (
+        <button
+          onClick={onAddNote}
+          className="absolute top-0 right-0 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <Plus className="h-3 w-3 text-gray-400" />
+        </button>
+      )}
     </div>
   );
 };
@@ -126,6 +122,7 @@ export function SchedulerGrid({
   shiftView,
   viewType,
   dayEvents,
+  isReadOnly,
   onDrop,
   onRemoveAssignment,
   onAddNote,
@@ -133,15 +130,62 @@ export function SchedulerGrid({
   onDeleteNote,
   onAddDayEvent,
   onDeleteDayEvent,
-  isReadOnly,
 }: SchedulerGridProps) {
   const gridTemplateColumns = `200px repeat(${dates.length}, minmax(120px, 1fr))`;
   const rowCount =
     shiftView === "all" ? resources.length * 2 : resources.length;
   const gridTemplateRows = `auto repeat(${rowCount}, minmax(48px, auto))`;
 
+  const renderCellContent = (
+    shift: ShiftType,
+    dateString: string,
+    resource: Resource
+  ) => {
+    return (
+      <>
+        {assignments
+          .filter((a) => {
+            if (a.shift !== shift || a.date !== dateString) return false;
+            return viewType === "personnel" || viewType === "all"
+              ? a.resourceId === resource.id
+              : a.workItemId === resource.id;
+          })
+          .map((assignment) => {
+            const itemToDisplay =
+              viewType === "personnel" || viewType === "all"
+                ? workItems.find((item) => item.id === assignment.workItemId)
+                : workItems.find((item) => item.id === assignment.resourceId);
+            return itemToDisplay ? (
+              <DraggableAssignment
+                key={assignment.id}
+                assignment={assignment}
+                itemToDisplay={itemToDisplay}
+                onRemoveAssignment={onRemoveAssignment}
+                isReadOnly={isReadOnly}
+              />
+            ) : null;
+          })}
+        {notes
+          .filter(
+            (n) =>
+              n.resourceId === resource.id &&
+              n.date === dateString &&
+              n.shift === shift
+          )
+          .map((note) => (
+            <NoteCard
+              key={note.id}
+              note={note}
+              onUpdate={onUpdateNote}
+              onDelete={onDeleteNote}
+              isReadOnly={isReadOnly}
+            />
+          ))}
+      </>
+    );
+  };
+
   return (
-    // FIX: Added `relative` class to establish a firm positioning context for sticky elements
     <div className="relative bg-white rounded-lg shadow overflow-x-auto">
       <div className="grid" style={{ gridTemplateColumns, gridTemplateRows }}>
         {/* === HEADER ROW === */}
@@ -151,25 +195,25 @@ export function SchedulerGrid({
         {dates.map((date) => {
           const dateString = date.toISOString().split("T")[0];
           const eventsForDay = dayEvents.filter((e) => e.date === dateString);
-
           let columnBgClass = isWeekend(date) ? "bg-slate-100" : "bg-gray-50";
           if (eventsForDay.some((e) => e.type === "event"))
             columnBgClass = "bg-blue-50";
           if (eventsForDay.some((e) => e.type === "holiday"))
             columnBgClass = "bg-green-50";
-
           return (
             <div
               key={date.toISOString()}
               className={`group sticky top-0 z-10 border-b border-r border-gray-200 p-2 text-center ${columnBgClass}`}
             >
               <div className="absolute top-1 right-1">
-                <DayEventManager
-                  date={dateString}
-                  events={eventsForDay}
-                  onAdd={onAddDayEvent}
-                  onDelete={onDeleteDayEvent}
-                />
+                {!isReadOnly && (
+                  <DayEventManager
+                    date={dateString}
+                    events={eventsForDay}
+                    onAdd={onAddDayEvent}
+                    onDelete={onDeleteDayEvent}
+                  />
+                )}
               </div>
               <div className="font-semibold text-gray-800">
                 {date.toLocaleDateString("en-US", { weekday: "short" })}
@@ -204,105 +248,6 @@ export function SchedulerGrid({
           const gridRowStart =
             2 + (shiftView === "all" ? resourceIndex * 2 : resourceIndex);
 
-          // Replace the existing renderCellContent function with this one
-          const renderCellContent = (
-            shift: ShiftType,
-            dateString: string,
-            resource: Resource
-          ) => {
-            // This block will log debug info for the first resource in your list to avoid spamming the console
-            if (
-              resources.length > 0 &&
-              resource.id === resources[0].id &&
-              shift === "day"
-            ) {
-              console.groupCollapsed(
-                `--- Debugging Cell: ${resource.name} / ${dateString} ---`
-              );
-
-              // Log the first assignment from the master list to see its format
-              if (assignments.length > 0) {
-                console.log(
-                  "Data format of first assignment from database:",
-                  assignments[0]
-                );
-              }
-
-              console.log("This cell is looking for values matching:", {
-                resourceId: resource.id,
-                date: dateString,
-                shift: shift,
-              });
-
-              // Log the result of each comparison for the first assignment
-              if (assignments.length > 0) {
-                const a = assignments[0];
-                console.log(`Comparing with assignment ${a.id}:`);
-                console.log(
-                  `  - Shift Test: '${a.shift}' === '${shift}'  -->  ${a.shift === shift}`
-                );
-                console.log(
-                  `  - Date Test:  '${a.date}' === '${dateString}'  -->  ${a.date === dateString}`
-                );
-                console.log(
-                  `  - Resource Test (for personnel view): '${a.resourceId}' === '${resource.id}'  -->  ${a.resourceId === resource.id}`
-                );
-              }
-
-              console.groupEnd();
-            }
-
-            return (
-              <>
-                {assignments
-                  .filter((a) => {
-                    if (a.shift !== shift || a.date !== dateString)
-                      return false;
-                    if (viewType === "personnel" || viewType === "all") {
-                      return a.resourceId === resource.id;
-                    } else {
-                      return a.workItemId === resource.id;
-                    }
-                  })
-                  .map((assignment) => {
-                    const itemToDisplay =
-                      viewType === "personnel" || viewType === "all"
-                        ? workItems.find(
-                            (item) => item.id === assignment.workItemId
-                          )
-                        : workItems.find(
-                            (item) => item.id === assignment.resourceId
-                          );
-                    return itemToDisplay ? (
-                      <Badge
-                        key={assignment.id}
-                        variant="secondary"
-                        className={`${itemToDisplay.color} text-white cursor-pointer`}
-                        onClick={() => onRemoveAssignment(assignment.id)}
-                      >
-                        {itemToDisplay.name}
-                      </Badge>
-                    ) : null;
-                  })}
-                {notes
-                  .filter(
-                    (n) =>
-                      n.resourceId === resource.id &&
-                      n.date === dateString &&
-                      n.shift === shift
-                  )
-                  .map((note) => (
-                    <NoteCard
-                      key={note.id}
-                      note={note}
-                      onUpdate={onUpdateNote}
-                      onDelete={onDeleteNote}
-                    />
-                  ))}
-              </>
-            );
-          };
-
           return (
             <React.Fragment key={resource.id}>
               <div
@@ -327,13 +272,11 @@ export function SchedulerGrid({
                   const eventsForDay = dayEvents.filter(
                     (e) => e.date === dateString
                   );
-
                   let columnBgClass = isWeekend(date) ? "bg-slate-100" : "";
                   if (eventsForDay.some((e) => e.type === "event"))
                     columnBgClass = "bg-blue-50";
                   if (eventsForDay.some((e) => e.type === "holiday"))
                     columnBgClass = "bg-green-50";
-
                   return (
                     <div
                       key={`${dateString}-day`}
@@ -362,13 +305,11 @@ export function SchedulerGrid({
                   const eventsForDay = dayEvents.filter(
                     (e) => e.date === dateString
                   );
-
                   let columnBgClass = isWeekend(date) ? "bg-slate-100" : "";
                   if (eventsForDay.some((e) => e.type === "event"))
                     columnBgClass = "bg-blue-50";
                   if (eventsForDay.some((e) => e.type === "holiday"))
                     columnBgClass = "bg-green-50";
-
                   return (
                     <div
                       key={`${dateString}-night`}
@@ -377,10 +318,10 @@ export function SchedulerGrid({
                       <DroppableCell
                         resourceId={resource.id}
                         date={dateString}
-                        shift="day"
+                        shift="night"
                         onDrop={onDrop}
                         onAddNote={() =>
-                          onAddNote(resource.id, dateString, "day")
+                          onAddNote(resource.id, dateString, "night")
                         }
                         isReadOnly={isReadOnly}
                       >

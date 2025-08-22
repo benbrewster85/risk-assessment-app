@@ -1,5 +1,4 @@
 /// <reference types="https://esm.sh/v135/@supabase/functions-js@2.4.1/src/edge-runtime.d.ts" />
-// In supabase/functions/seed-absence-types/index.ts
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -13,17 +12,17 @@ const DEFAULT_ABSENCE_TYPES = [
 Deno.serve(async (req) => {
   try {
     const payload = await req.json();
-    const teamRecord = payload.record; // The new row from the 'teams' table
+    const teamRecord = payload.record;
     const teamId = teamRecord.id;
 
     if (!teamId) {
       throw new Error("Team ID is missing in the payload.");
     }
 
-    // Create a Supabase client with the service_role key to bypass RLS
+    // Create a Supabase client using the securely stored environment variables
     const supabaseAdmin = createClient(
-      Deno.env.get('https://plsypgvutyipmdqyphly.supabase.co') ?? '',
-      Deno.env.get('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsc3lwZ3Z1dHlpcG1kcXlwaGx5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0OTkwMzYzMCwiZXhwIjoyMDY1NDc5NjMwfQ.-_dbm_psQf2Z34jqnPIGvLOcFPNeFyme11m8HFsvxXE') ?? ''
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     // Prepare the new rows, adding the new team_id to each
@@ -46,6 +45,7 @@ Deno.serve(async (req) => {
       status: 200,
     });
   } catch (err) {
-    return new Response(String(err?.message ?? err), { status: 500 });
+    const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
+    return new Response(errorMessage, { status: 500 });
   }
 });
