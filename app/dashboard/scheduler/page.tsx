@@ -40,6 +40,7 @@ import {
   createNote,
   updateNote,
   deleteNote,
+  updateAssignment,
 } from "@/lib/supabase/scheduler";
 import { getUserProfile } from "@/lib/supabase/profiles";
 
@@ -281,11 +282,11 @@ export default function SchedulerPage() {
     // Case 1: An EXISTING assignment card from the grid was moved
     if (type === "ASSIGNMENT_CARD") {
       const movedAssignment = item as Assignment;
+      const previousAssignments = assignments; // Back up state for rollback
 
-      // Here you would add the database call to UPDATE the assignment
-      // For now, we just update the local state:
-      setAssignments((prevAssignments) =>
-        prevAssignments.map((a) =>
+      // Optimistic UI update (this part stays the same)
+      setAssignments((prev) =>
+        prev.map((a) =>
           a.id === movedAssignment.id
             ? {
                 ...a,
@@ -296,7 +297,18 @@ export default function SchedulerPage() {
             : a
         )
       );
-      // Example of a future database call: await updateAssignmentInDb(movedAssignment.id, { ... });
+
+      // Call the database to persist the change
+      try {
+        await updateAssignment(movedAssignment.id, {
+          resourceId: targetResourceId,
+          date: targetDate,
+          shift: targetShift,
+        });
+      } catch (error) {
+        toast.error("Failed to move assignment.");
+        setAssignments(previousAssignments); // Revert on failure
+      }
       return;
     }
 
@@ -304,16 +316,17 @@ export default function SchedulerPage() {
     if (type === "WORK_ITEM") {
       const workItem = item as WorkItem;
 
-      // --- Step 1: Perform all synchronous checks and data preparation first ---
+      // Determine the type of assignment being created
       let assignmentType: "project" | "equipment" | "vehicle" | "absence";
-      // ... (Determine assignmentType based on workItem.type)
       if (workItem.type === "project") {
         assignmentType = "project";
       } else if (workItem.type === "equipment") {
         assignmentType = "equipment";
       } else if (workItem.type === "vehicle") {
         assignmentType = "vehicle";
-      } else if (workItem.type === "personnel") {
+      } else if (workItem.type === "absence") {
+        assignmentType = "absence";
+      } else {
         const targetResource = allResources.find(
           (r) => r.id === targetResourceId
         );
@@ -322,60 +335,73 @@ export default function SchedulerPage() {
         } else if (targetResource?.type === "vehicles") {
           assignmentType = "vehicle";
         } else {
-          console.warn("🛑 EXIT: Invalid assignment target.");
           return;
         }
-      } else if (workItem.type === "absence") {
-        assignmentType = "absence";
-      } else {
-        console.warn("🛑 EXIT: Unknown item type.", item);
-        return;
       }
 
-      // --- Business Rule Checks (using the current `assignments` state) ---
-      if (viewType === "personnel" || viewType === "all") {
-        if (assignmentType === "equipment" || assignmentType === "vehicle") {
-          if (
-            assignments.some(
-              (a) =>
-                a.workItemId === workItem.id &&
-                a.date === targetDate &&
-                a.shift === targetShift
-            )
-          ) {
-            toast.error(
-              `${workItem.name} is already assigned elsewhere in this shift.`
-            );
-            return;
-          }
-        }
-      } else {
-        if (
-          assignments.some(
-            (a) =>
-              a.workItemId === targetResourceId &&
-              a.date === targetDate &&
-              a.shift === targetShift
-          )
-        ) {
-          toast.error(`This resource already has an assignment in this shift.`);
-          return;
-        }
-        if (
-          assignments.some(
-            (a) =>
-              a.resourceId === workItem.id &&
-              a.date === targetDate &&
-              a.shift === targetShift &&
-              a.assignmentType === assignmentType
-          )
-        ) {
+      // --- BUSINESS RULE CHECKS ---
+
+      // RULE 1: A specific asset or vehicle cannot be assigned to more than one person in the same shift.
+      if (assignmentType === "equipment" || assignmentType === "vehicle") {
+        const itemToCheckId =
+          viewType === "personnel" || viewType === "all"
+            ? workItem.id
+            : targetResourceId;
+        const conflict = assignments.find(
+          (a) =>
+            a.workItemId === itemToCheckId &&
+            a.date === targetDate &&
+            a.shift === targetShift
+        );
+
+        if (conflict) {
+          const itemToAssign = allResources.find((r) => r.id === itemToCheckId);
+          const assignedTo = allResources.find(
+            (r) => r.id === conflict.resourceId
+          );
           toast.error(
-            `${workItem.name} is already assigned elsewhere in this shift.`
+            `${itemToAssign?.name || "This item"} is already assigned to ${assignedTo?.name || "someone"} in this shift.`
           );
           return;
         }
       }
+
+      // Get the person who is receiving the assignment and their existing assignments for the shift.
+      const personToAssignId =
+        viewType === "personnel" || viewType === "all"
+          ? targetResourceId
+          : workItem.id;
+      const assignmentsForPerson = assignments.filter(
+        (a) =>
+          a.resourceId === personToAssignId &&
+          a.date === targetDate &&
+          a.shift === targetShift
+      );
+      const personName =
+        allResources.find((r) => r.id === personToAssignId)?.name ||
+        "This person";
+
+      // RULE 2: A person can only have ONE project assignment.
+      if (assignmentType === "project") {
+        if (assignmentsForPerson.some((a) => a.assignmentType === "project")) {
+          toast.error(
+            `${personName} is already assigned to a project in this shift.`
+          );
+          return;
+        }
+      }
+
+      // RULE 3: A person can only have ONE vehicle assignment.
+      if (assignmentType === "vehicle") {
+        if (assignmentsForPerson.some((a) => a.assignmentType === "vehicle")) {
+          toast.error(
+            `${personName} is already assigned to a vehicle in this shift.`
+          );
+          return;
+        }
+      }
+
+      // --- All checks passed, proceed to create the assignment ---
 
       const finalWorkItemId =
         viewType === "personnel" || viewType === "all"
@@ -386,7 +412,9 @@ export default function SchedulerPage() {
           ? targetResourceId
           : workItem.id;
 
-      const newAssignmentData = {
+      const tempId = `temp-${Date.now()}`;
+      const newAssignmentData: Assignment = {
+        id: tempId,
         workItemId: finalWorkItemId,
         resourceId: finalResourceId,
         date: targetDate,
@@ -395,27 +423,18 @@ export default function SchedulerPage() {
         duration: workItem.duration || 1,
       };
 
-      // --- Step 2: Perform the optimistic update and DB call ---
-      const tempId = `temp-${Date.now()}`;
-      const optimisticAssignment: Assignment = {
-        ...newAssignmentData,
-        id: tempId,
-      };
-
-      // 1. Update the UI immediately with a temporary assignment
-      setAssignments((prev) => [...prev, optimisticAssignment]);
-
-      // 2. Call the database in the background
+      setAssignments((prev) => [...prev, newAssignmentData]);
       try {
         if (!teamId) throw new Error("Team ID not found");
-        await createAssignment(optimisticAssignment, teamId);
-
-        // 3. Refresh server data to get the real ID and sync state
-        router.refresh();
+        const createdAssignment = await createAssignment(
+          newAssignmentData,
+          teamId
+        );
+        setAssignments((prevAssignments) =>
+          prevAssignments.map((a) => (a.id === tempId ? createdAssignment : a))
+        );
       } catch (error) {
-        console.error("Failed to create assignment:", error);
         toast.error("Failed to save assignment.");
-        // 4. If the database call fails, revert the UI change
         setAssignments((prev) => prev.filter((a) => a.id !== tempId));
       }
     }

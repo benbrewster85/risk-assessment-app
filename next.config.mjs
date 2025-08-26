@@ -12,6 +12,9 @@ const nextConfig = {
     });
     return config;
   },
+  experimental: {
+    serverComponentsExternalPackages: ['@supabase/ssr'],
+  },
 };
 
 export default nextConfig;

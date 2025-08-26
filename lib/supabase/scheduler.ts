@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { Resource, WorkItem, Assignment, SchedulerNote, DayEvent } from "@/lib/types";
+import { Resource, WorkItem, Assignment, SchedulerNote, DayEvent, ShiftType } from "@/lib/types";
 
 const supabase = createClient();
 
@@ -157,7 +157,7 @@ export async function createAssignment(assignment: Assignment, teamId: string) {
     personnel_id: assignment.resourceId,
     asset_id: assignment.assignmentType === 'equipment' ? assignment.workItemId : null,
     vehicle_id: assignment.assignmentType === 'vehicle' ? assignment.workItemId : null,
-    absence_type_id: assignment.assignmentType === 'absence' ? assignment.workItemId : null, // <-- The new logic
+    absence_type_id: assignment.assignmentType === 'absence' ? assignment.workItemId : null,
   };
 
   const { data, error } = await supabase
@@ -167,7 +167,19 @@ export async function createAssignment(assignment: Assignment, teamId: string) {
     .single();
 
   if (error) throw error;
-  return data as Assignment;
+
+  // Format the raw database response to match the front-end 'Assignment' type
+  const formattedAssignment: Assignment = {
+    id: data.id,
+    date: data.assignment_date,
+    shift: data.shift,
+    resourceId: data.personnel_id,
+    workItemId: data.project_id || data.asset_id || data.vehicle_id || data.absence_type_id,
+    assignmentType: assignment.assignmentType,
+    duration: assignment.duration,
+  };
+
+  return formattedAssignment;
 }
 
 // DELETES an assignment from the database
@@ -175,6 +187,23 @@ export async function deleteAssignment(assignmentId: string) {
   const { error } = await supabase
     .from('schedule_assignments')
     .delete()
+    .eq('id', assignmentId);
+
+  if (error) throw error;
+}
+
+// UPDATES an existing assignment in the database
+export async function updateAssignment(
+  assignmentId: string,
+  updates: { resourceId: string; date: string; shift: ShiftType }
+) {
+  const { error } = await supabase
+    .from('schedule_assignments')
+    .update({
+      personnel_id: updates.resourceId, // Maps the front-end prop to the DB column
+      assignment_date: updates.date,
+      shift: updates.shift,
+    })
     .eq('id', assignmentId);
 
   if (error) throw error;
