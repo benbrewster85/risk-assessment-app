@@ -345,9 +345,6 @@ export default function SchedulerPage() {
         finalWorkItemId = targetResourceId;
         finalResourceId = workItem.id;
       }
-      // For all other cases, including dragging an absence onto any resource,
-      // the workItem is the item, and the resource is the target cell. No swap needed.
-      // --- END: CORRECTED ID ASSIGNMENT LOGIC ---
 
       const tempId = `temp-${Date.now()}`;
       const newAssignment: Assignment = {
