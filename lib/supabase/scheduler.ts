@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { Resource, WorkItem, Assignment, SchedulerNote, DayEvent, ShiftType } from "@/lib/types";
+import { Resource, WorkItem, Assignment, SchedulerNote, DayEvent, ShiftType, ResourceType } from "@/lib/types";
 
 const supabase = createClient();
 
@@ -80,12 +80,18 @@ export async function getSchedulableWorkItems(teamId: string): Promise<WorkItem[
 
   const { data: absences, error: aError } = await supabase
     .from('absence_types')
-    .select('id, name, color')
-    .eq('team_id', teamId); // <-- The crucial filter
+    .select('id, name, color, category') // 1. Select the category
+    .eq('team_id', teamId);
   if (aError) throw aError;
 
   const projectItems: WorkItem[] = projects?.map((p: any) => ({ id: p.id, name: p.name, type: 'project', color: 'bg-orange-500' })) || [];
-  const absenceItems: WorkItem[] = absences?.map((a: any) => ({ id: a.id, name: a.name, type: 'absence', color: a.color })) || [];
+  const absenceItems: WorkItem[] = absences?.map((a: any) => ({
+    id: a.id,
+    name: a.name,
+    type: 'absence',
+    color: a.color,
+    category: a.category, // 2. Add the category to the WorkItem object
+  })) || [];
 
   return [...projectItems, ...absenceItems];
 }
@@ -102,20 +108,33 @@ export async function getSchedulerData(teamId: string) {
   const { data: rawDayEvents, error: dError } = await supabase.from('day_events').select('*').eq('team_id', teamId);
   if (dError) throw dError;
 
-  const assignments: Assignment[] = (rawAssignments || []).map((a: any) => {
-    let assignmentType: any = 'project';
-    let workItemId = a.project_id;
-    let resourceId = a.personnel_id;
+  const assignments: Assignment[] = (rawAssignments || [])
+    .map((a: any) => {
+    let assignmentType: any;
+    let workItemId: string | null = null;
+    let resourceId: string | null = null;
 
+    if (a.absence_type_id) {
+        // Case 1: Absence assignment
+        assignmentType = 'absence';
+        workItemId = a.absence_type_id;
+        // The resource is whichever of the other columns is filled
+        resourceId = a.personnel_id || a.asset_id || a.vehicle_id;
+    } else if (a.project_id) {
+        // Case 2: Project assignment
+        assignmentType = 'project';
+        workItemId = a.project_id;
+        resourceId = a.personnel_id; // Projects are assigned to people
+    } else {
+        // Case 3: Person assigned to Equipment/Vehicle
+        resourceId = a.personnel_id;
     if (a.asset_id) {
       assignmentType = 'equipment';
       workItemId = a.asset_id;
     } else if (a.vehicle_id) {
       assignmentType = 'vehicle';
       workItemId = a.vehicle_id;
-    } else if (a.absence_type_id) { // <-- The new logic
-      assignmentType = 'absence';
-      workItemId = a.absence_type_id;
+        }
     }
 
     return {
@@ -126,7 +145,8 @@ export async function getSchedulerData(teamId: string) {
       workItemId: workItemId,
       assignmentType: assignmentType,
     };
-  });
+    })
+    .filter((a): a is Assignment => !!a.resourceId && !!a.workItemId); // <-- This line removes any assignments with null IDs
 
   const notes: SchedulerNote[] = (rawNotes || []).map((n: any) => ({
     id: n.id,
@@ -148,32 +168,62 @@ export async function getSchedulerData(teamId: string) {
 }
 
 // CREATES a new assignment in the database
-export async function createAssignment(assignment: Assignment, teamId: string) {
-  const assignmentData = {
+export async function createAssignment(assignment: Assignment, teamId: string, targetResourceType: ResourceType) {
+  const dataToInsert: { [key: string]: any } = {
     team_id: teamId,
     assignment_date: assignment.date,
     shift: assignment.shift,
-    project_id: assignment.assignmentType === 'project' ? assignment.workItemId : null,
-    personnel_id: assignment.resourceId,
-    asset_id: assignment.assignmentType === 'equipment' ? assignment.workItemId : null,
-    vehicle_id: assignment.assignmentType === 'vehicle' ? assignment.workItemId : null,
-    absence_type_id: assignment.assignmentType === 'absence' ? assignment.workItemId : null,
+    project_id: null,
+    personnel_id: null,
+    asset_id: null,
+    vehicle_id: null,
+    absence_type_id: null,
   };
+
+  if (assignment.assignmentType === 'project' || assignment.assignmentType === 'absence') {
+    // Use Case 1: A work item (Project/Absence) is assigned TO a resource.
+    if (assignment.assignmentType === 'project') {
+      dataToInsert.project_id = assignment.workItemId;
+    } else { // absence
+      dataToInsert.absence_type_id = assignment.workItemId;
+    }
+
+    // The resource the work is assigned to
+  if (targetResourceType === 'personnel') {
+    dataToInsert.personnel_id = assignment.resourceId;
+  } else if (targetResourceType === 'equipment') {
+    dataToInsert.asset_id = assignment.resourceId;
+  } else if (targetResourceType === 'vehicles') {
+    dataToInsert.vehicle_id = assignment.resourceId;
+  }
+  } else if (assignment.assignmentType === 'equipment' || assignment.assignmentType === 'vehicle') {
+    // Use Case 2: A person is assigned TO a resource (Equipment/Vehicle).
+    dataToInsert.personnel_id = assignment.resourceId; // The resource being assigned is always a person here
+    
+    if (assignment.assignmentType === 'equipment') {
+      dataToInsert.asset_id = assignment.workItemId; // The "work item" is the equipment
+    } else { // vehicle
+      dataToInsert.vehicle_id = assignment.workItemId; // The "work item" is the vehicle
+    }
+  }
 
   const { data, error } = await supabase
     .from('schedule_assignments')
-    .insert(assignmentData)
+    .insert(dataToInsert)
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error("Supabase insert error:", error);
+    throw error;
+  }
 
   // Format the raw database response to match the front-end 'Assignment' type
   const formattedAssignment: Assignment = {
     id: data.id,
     date: data.assignment_date,
     shift: data.shift,
-    resourceId: data.personnel_id,
+    resourceId: data.personnel_id || data.asset_id || data.vehicle_id,
     workItemId: data.project_id || data.asset_id || data.vehicle_id || data.absence_type_id,
     assignmentType: assignment.assignmentType,
     duration: assignment.duration,
@@ -181,6 +231,7 @@ export async function createAssignment(assignment: Assignment, teamId: string) {
 
   return formattedAssignment;
 }
+
 
 // DELETES an assignment from the database
 export async function deleteAssignment(assignmentId: string) {

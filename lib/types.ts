@@ -110,20 +110,29 @@ export type ShiftView = 'all' | 'day' | 'night';
 export interface WorkItem {
   id: string;
   name: string;
-  // Make sure 'absence' is included here
-  type: 'project' | 'equipment' | 'vehicle' | 'personnel' | 'absence';
+  type: "project" | "equipment" | "vehicle" | "personnel" | "absence";
   color: string;
   duration?: number;
+  category?: 'personnel' | 'equipment' | 'vehicle'; 
 }
 
 export interface Assignment {
   id: string;
-  workItemId: string;
-  resourceId: string;
   date: string;
   shift: ShiftType;
-  // Make sure 'absence' is included here
+  resourceId: string;
+  workItemId: string;
   assignmentType: 'project' | 'equipment' | 'vehicle' | 'absence';
+  resourceType?: 'personnel' | 'equipment' | 'vehicles'; // Add this
+  duration?: number;
+}
+
+export interface WorkItem {
+  id: string;
+  name: string;
+  type: 'project' | 'absence' | 'equipment' | 'vehicle' | 'personnel';
+  color: string;
+  category?: 'personnel' | 'equipment' | 'vehicle';  
   duration?: number;
 }
 
@@ -133,7 +142,6 @@ export interface Resource {
   type: ResourceType;
   avatar?: string;
 }
-
 
 
 export interface SchedulerNote {
@@ -151,3 +159,52 @@ export interface DayEvent {
   type: 'holiday' | 'event' | 'blocker';
   color: string;
 }
+
+export interface Message {
+  id: number;
+  created_at: string;
+  sender_id: string | null;
+  recipient_id: string;
+  content: string | null;
+  is_read: boolean;
+  acknowledged_at: string | null; 
+  sender: {
+    first_name: string | null;
+    last_name: string | null;
+  } | null;
+}
+
+export interface TaskSummary {
+  title: string;
+  status: string;
+}
+
+export interface NextJobDetails {
+  project_id: string;
+  project_name: string;
+  brief_statement: string;
+  location_address: string;
+  event_date: string;
+  shift_pattern: string;
+  tasks: TaskSummary[];
+}
+
+export type Competency = { 
+  id: string; 
+  name: string; 
+  category: 'certification' | 'training' | 'competence';
+  description: string | null;
+};
+
+export type UserCompetency = {
+  id: string;
+  user_id: string;
+  competency_id: string;
+  achieved_date: string;
+  expiry_date: string | null;
+  certificate_file_path: string | null;
+  competencies: { name: string }[] | null; 
+  competency: { // Renamed from 'competencies' to singular for clarity
+    name: string;
+  } | null;
+};

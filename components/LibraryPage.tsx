@@ -19,6 +19,7 @@ type LibraryPageProps = {
   risks: LibraryItem[];
   assetCategories: AssetCategory[];
   assetStatuses: LibraryItem[];
+  competencies: LibraryItem[]; // <-- ADDED
   teamMembers: TeamMember[];
   teamId: string;
 };
@@ -30,21 +31,25 @@ export default function LibraryPage({
   risks: initialRisks,
   assetCategories: initialAssetCategories,
   assetStatuses: initialAssetStatuses,
+  competencies: initialCompetencies, // <-- ADDED
   teamMembers,
   teamId,
 }: LibraryPageProps) {
   const supabase = createClient();
 
+  // 2. ADD STATE: Create state for competencies
   const [hazards, setHazards] = useState(initialHazards);
   const [risks, setRisks] = useState(initialRisks);
   const [assetCategories, setAssetCategories] = useState(
     initialAssetCategories
   );
   const [assetStatuses, setAssetStatuses] = useState(initialAssetStatuses);
+  const [competencies, setCompetencies] = useState(initialCompetencies); // <-- ADDED
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // 3. UPDATE TYPES: Add 'competency' as a possible modal type
   const [modalType, setModalType] = useState<
-    "hazard" | "risk" | "category" | "status" | null
+    "hazard" | "risk" | "category" | "status" | "competency" | null // <-- ADDED 'competency'
   >(null);
   const [editingItem, setEditingItem] = useState<
     LibraryItem | AssetCategory | null
@@ -72,13 +77,15 @@ export default function LibraryPage({
         return "asset_categories";
       case "status":
         return "asset_statuses";
+      case "competency": // <-- ADDED
+        return "competencies";
       default:
         return "";
     }
   };
 
   const openModal = (
-    type: "hazard" | "risk" | "category" | "status",
+    type: "hazard" | "risk" | "category" | "status" | "competency", // <-- ADDED 'competency'
     item: LibraryItem | AssetCategory | null = null
   ) => {
     setModalType(type);
@@ -103,6 +110,10 @@ export default function LibraryPage({
     if (modalType === "category") {
       recordData.owner_id = selectedOwner;
     }
+    // ADDED: Set the category for a new competency
+    if (modalType === "competency" && !editingItem) {
+      recordData.category = "certification"; // Or have a dropdown in the modal
+    }
 
     const { data, error } = editingItem
       ? await supabase
@@ -119,7 +130,7 @@ export default function LibraryPage({
       toast.success(
         `${modalType.charAt(0).toUpperCase() + modalType.slice(1)} ${editingItem ? "updated" : "added"}!`
       );
-      window.location.reload();
+      window.location.reload(); // Reload to reflect changes from the parent
     }
     setIsSubmitting(false);
     setIsModalOpen(false);
@@ -180,7 +191,7 @@ export default function LibraryPage({
               value={newItemName}
               onChange={(e) => setNewItemName(e.target.value)}
               required
-              className="mt-1 block w-full"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             />
           </div>
           {modalType === "category" && (
@@ -191,7 +202,7 @@ export default function LibraryPage({
               <select
                 value={selectedOwner || ""}
                 onChange={(e) => setSelectedOwner(e.target.value)}
-                className="mt-1 block w-full"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               >
                 <option value="">(No specific owner)</option>
                 {teamMembers.map((member) => (
@@ -368,6 +379,45 @@ export default function LibraryPage({
             ))}
           </ul>
         </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold">Competencies</h2>
+          <button
+            onClick={() => openModal("competency")}
+            className="bg-blue-600 text-white font-bold py-2 px-3 text-sm rounded-lg hover:bg-blue-700 flex items-center"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Competency
+          </button>
+        </div>
+        <ul className="divide-y divide-gray-200">
+          {competencies.map((item) => (
+            <li
+              key={item.id}
+              className="py-2 flex justify-between items-center"
+            >
+              <p>{item.name}</p>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => openModal("competency", item)}
+                  className="p-1 text-gray-500 hover:text-indigo-600"
+                >
+                  <Edit2 size={16} />
+                </button>
+                <button
+                  onClick={() =>
+                    setDeletingItem({ ...item, type: "competency" })
+                  }
+                  className="p-1 text-gray-500 hover:text-red-600"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className="bg-white p-6 rounded-lg shadow">

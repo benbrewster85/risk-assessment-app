@@ -13,18 +13,23 @@ import {
   DayEvent,
 } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
-import { Sun, Moon, Users, Truck, Wrench, Plus } from "lucide-react";
+import { Users, Truck, Wrench, Plus } from "lucide-react";
 import { NoteCard } from "./NoteCard";
 import { DayEventManager } from "./DayEventManager";
 import { DraggableAssignment } from "./DraggableAssignment";
 
-// Helper function to calculate the week of the year
+// Helper function to calculate the week of the year (ISO 8601 standard)
 const getWeekOfYear = (date: Date): number => {
-  const startOfYear = new Date(date.getFullYear(), 0, 1);
-  const diff = date.getTime() - startOfYear.getTime();
-  const oneDay = 1000 * 60 * 60 * 24;
-  const dayOfYear = Math.floor(diff / oneDay) + 1;
-  return Math.ceil(dayOfYear / 7);
+  const d = new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+  );
+  // Set to nearest Thursday: current date + 4 - current day number
+  // Makes Monday=1... Sunday=7
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  // Calculate full weeks to nearest Thursday
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 };
 
 // Helper function to check for weekends
@@ -146,15 +151,26 @@ export function SchedulerGrid({
         {assignments
           .filter((a) => {
             if (a.shift !== shift || a.date !== dateString) return false;
-            return viewType === "personnel" || viewType === "all"
-              ? a.resourceId === resource.id
-              : a.workItemId === resource.id;
+            // An assignment is relevant to this cell if the cell's resource (the row)
+            // is involved in the assignment as either the primary resource or the work item.
+            return a.resourceId === resource.id || a.workItemId === resource.id;
           })
           .map((assignment) => {
-            const itemToDisplay =
-              viewType === "personnel" || viewType === "all"
-                ? workItems.find((item) => item.id === assignment.workItemId)
-                : workItems.find((item) => item.id === assignment.resourceId);
+            let itemToDisplay;
+
+            // If the row's resource is the assignment's primary resource, display the work item.
+            if (assignment.resourceId === resource.id) {
+              itemToDisplay = workItems.find(
+                (item) => item.id === assignment.workItemId
+              );
+            }
+            // If the row's resource is the assignment's work item, display the primary resource.
+            else if (assignment.workItemId === resource.id) {
+              itemToDisplay = workItems.find(
+                (item) => item.id === assignment.resourceId
+              );
+            }
+
             return itemToDisplay ? (
               <DraggableAssignment
                 key={assignment.id}
@@ -267,7 +283,7 @@ export function SchedulerGrid({
               </div>
 
               {shiftView !== "night" &&
-                dates.map((date) => {
+                dates.map((date, dateIndex) => {
                   const dateString = date.toISOString().split("T")[0];
                   const eventsForDay = dayEvents.filter(
                     (e) => e.date === dateString
@@ -277,10 +293,16 @@ export function SchedulerGrid({
                     columnBgClass = "bg-blue-50";
                   if (eventsForDay.some((e) => e.type === "holiday"))
                     columnBgClass = "bg-green-50";
+
+                  const borderClass =
+                    dateIndex === 0
+                      ? "shadow-[inset_2px_0_0_0_theme(colors.day-border)]"
+                      : "";
+
                   return (
                     <div
                       key={`${dateString}-day`}
-                      className={`border-r border-b border-gray-200 ${columnBgClass}`}
+                      className={`border-r border-b border-gray-200 ${columnBgClass} ${borderClass}`}
                     >
                       <DroppableCell
                         resourceId={resource.id}
@@ -292,7 +314,6 @@ export function SchedulerGrid({
                         }
                         isReadOnly={isReadOnly}
                       >
-                        <Sun className="w-3 h-3 text-yellow-500 mr-1 opacity-50" />
                         {renderCellContent("day", dateString, resource)}
                       </DroppableCell>
                     </div>
@@ -300,7 +321,7 @@ export function SchedulerGrid({
                 })}
 
               {shiftView !== "day" &&
-                dates.map((date) => {
+                dates.map((date, dateIndex) => {
                   const dateString = date.toISOString().split("T")[0];
                   const eventsForDay = dayEvents.filter(
                     (e) => e.date === dateString
@@ -310,10 +331,16 @@ export function SchedulerGrid({
                     columnBgClass = "bg-blue-50";
                   if (eventsForDay.some((e) => e.type === "holiday"))
                     columnBgClass = "bg-green-50";
+
+                  const borderClass =
+                    dateIndex === 0
+                      ? "shadow-[inset_2px_0_0_0_theme(colors.night-border)]"
+                      : "";
+
                   return (
                     <div
                       key={`${dateString}-night`}
-                      className={`border-r border-b border-gray-200 ${columnBgClass}`}
+                      className={`border-r border-b border-gray-200 ${columnBgClass} ${borderClass}`}
                     >
                       <DroppableCell
                         resourceId={resource.id}
@@ -325,7 +352,6 @@ export function SchedulerGrid({
                         }
                         isReadOnly={isReadOnly}
                       >
-                        <Moon className="w-3 h-3 text-indigo-500 mr-1 opacity-50" />
                         {renderCellContent("night", dateString, resource)}
                       </DroppableCell>
                     </div>

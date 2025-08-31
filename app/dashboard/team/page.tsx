@@ -22,6 +22,10 @@ export default function TeamPage() {
   const [risks, setRisks] = useState<LibraryItem[]>([]);
   const [assetCategories, setAssetCategories] = useState<AssetCategory[]>([]);
   const [assetStatuses, setAssetStatuses] = useState<LibraryItem[]>([]);
+
+  // MOVED a new state for competencies here
+  const [competencies, setCompetencies] = useState<LibraryItem[]>([]);
+
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -52,6 +56,7 @@ export default function TeamPage() {
             teamResult,
             categoriesResult,
             statusesResult,
+            competenciesResult,
           ] = await Promise.all([
             supabase
               .from("profiles")
@@ -80,6 +85,12 @@ export default function TeamPage() {
               .from("asset_statuses")
               .select("*")
               .eq("team_id", teamId)
+              .order("name"), // <-- The comma here is crucial
+            supabase
+              .from("competencies")
+              .select("id, name")
+              .eq("team_id", teamId)
+              .eq("is_archived", false)
               .order("name"),
           ]);
 
@@ -95,6 +106,8 @@ export default function TeamPage() {
             setAssetCategories(transformedCategories as AssetCategory[]);
           }
           if (statusesResult.data) setAssetStatuses(statusesResult.data);
+          // ADDED: Set competencies state
+          if (competenciesResult.data) setCompetencies(competenciesResult.data);
         }
       }
       setLoading(false);
@@ -341,6 +354,7 @@ export default function TeamPage() {
                   risks={risks}
                   assetCategories={assetCategories}
                   assetStatuses={assetStatuses}
+                  competencies={competencies} // Pass the new prop
                   teamMembers={teamMembers}
                   teamId={team.id}
                 />

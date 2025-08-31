@@ -1,9 +1,8 @@
 "use client";
 
+import React, { useState, useMemo, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
-
-import React, { useState, useMemo, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import {
@@ -47,89 +46,63 @@ import { getUserProfile } from "@/lib/supabase/profiles";
 type TimeView = "day" | "week" | "month";
 
 export default function SchedulerPage() {
+  // --- HOOKS ---
   const router = useRouter();
-  const [allResources, setAllResources] = useState<Resource[]>([]);
-  const [allWorkItems, setAllWorkItems] = useState<WorkItem[]>([]);
 
-  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadInitialData = async () => {
-      console.log("Debug Step 1: Starting to load initial data...");
-      setIsLoading(true);
-      try {
-        // --- Check 1: Can we get the user's profile and team? ---
-        const profile = await getUserProfile();
-        console.log("Debug Step 2: Fetched profile:", profile);
-
-        if (!profile || !profile.team_id) {
-          console.error(
-            "DEBUG FAIL: No profile or team_id was found for the current user. Halting data load."
-          );
-          setIsLoading(false); // Stop the loading indicator
-          return;
-        }
-
-        const teamId = profile.team_id;
-        console.log("Debug Step 3: Found team_id:", teamId);
-        setCurrentUserRole(profile.role);
-        setTeamId(teamId);
-
-        // --- Check 2: Can we get the data for that team? ---
-        console.log(
-          "Debug Step 4: Fetching all scheduler data for the team..."
-        );
-        const resources = await getSchedulableResources(teamId);
-        const workItems = await getSchedulableWorkItems(teamId);
-        const { assignments, notes, dayEvents } =
-          await getSchedulerData(teamId);
-        console.log("Debug Step 5: Data received from Supabase:", {
-          assignments,
-          notes,
-          dayEvents,
-          resources,
-          workItems,
-        });
-
-        // --- Check 3: Is the state being set? ---
-        console.log(
-          "Debug Step 6: Setting component state with the fetched data..."
-        );
-        setAllResources(resources);
-        setAllWorkItems(workItems);
-        setAssignments(assignments);
-        setNotes(notes);
-        setDayEvents(dayEvents);
-        console.log("Debug Step 7: State has been set.");
-      } catch (error) {
-        console.error(
-          "DEBUG FAIL: An error occurred inside the useEffect data loading process:",
-          error
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadInitialData();
-  }, []); // This hook still only runs once on page load
   // --- STATE DECLARATIONS ---
   const [isLoading, setIsLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState<ResourceType>("personnel");
   const [shiftView, setShiftView] = useState<ShiftView>("all");
+  const [timeView, setTimeView] = useState<TimeView>("week");
+
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [notes, setNotes] = useState<SchedulerNote[]>([]);
-  const [dayEvents, setDayEvents] = useState<DayEvent[]>([
-    {
-      id: "evt-1",
-      date: "2025-08-25",
-      text: "Summer Bank Holiday",
-      type: "holiday",
-      color: "bg-green-100 text-green-800",
-    },
-  ]);
-  const [timeView, setTimeView] = useState<TimeView>("week");
+  const [dayEvents, setDayEvents] = useState<DayEvent[]>([]);
+
+  const [allResources, setAllResources] = useState<Resource[]>([]);
+  const [allWorkItems, setAllWorkItems] = useState<WorkItem[]>([]);
+
+  const [teamId, setTeamId] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+
+  // --- DATA FETCHING ---
+  useEffect(() => {
+    const loadInitialData = async () => {
+      setIsLoading(true);
+      try {
+        const profile = await getUserProfile();
+        if (!profile || !profile.team_id) {
+          console.warn(
+            "User profile or team not found. Cannot load scheduler data."
+          );
+          setIsLoading(false);
+          return;
+        }
+
+        const teamId = profile.team_id;
+        setTeamId(teamId);
+        setCurrentUserRole(profile.role);
+
+        const resources = await getSchedulableResources(teamId);
+        const workItems = await getSchedulableWorkItems(teamId);
+        const { assignments, notes, dayEvents } =
+          await getSchedulerData(teamId);
+
+        setAllResources(resources);
+        setAllWorkItems(workItems);
+        setAssignments(assignments);
+        setNotes(notes);
+        setDayEvents(dayEvents);
+      } catch (error) {
+        console.error("Failed to load scheduler data:", error);
+        toast.error("Failed to load scheduler data.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadInitialData();
+  }, []);
 
   // --- HANDLER FUNCTIONS ---
   const handleAddDayEvent = async (
@@ -138,8 +111,6 @@ export default function SchedulerPage() {
     type: DayEvent["type"]
   ) => {
     if (!teamId) return toast.error("Cannot add event: Team not found.");
-
-    // Create a temporary event for the optimistic update
     const tempId = `temp-${Date.now()}`;
     const color =
       type === "holiday"
@@ -148,33 +119,89 @@ export default function SchedulerPage() {
           ? "bg-red-100 text-red-800"
           : "bg-blue-100 text-blue-800";
     const newEvent: DayEvent = { id: tempId, date, text, type, color };
-
-    // 1. Update the UI immediately
     setDayEvents((prev) => [...prev, newEvent]);
-
-    // 2. Call the database
     try {
       await createDayEvent(newEvent, teamId);
-      router.refresh(); // Refresh to sync data with the server
+      router.refresh();
     } catch (error) {
       toast.error("Failed to add event.");
-      // 3. Revert the UI change on failure
       setDayEvents((prev) => prev.filter((e) => e.id !== tempId));
     }
   };
 
   const handleDeleteDayEvent = async (eventId: string) => {
     const previousEvents = dayEvents;
-    // 1. Optimistic update
     setDayEvents((prev) => prev.filter((e) => e.id !== eventId));
-
-    // 2. Call the database
     try {
       await deleteDayEvent(eventId);
     } catch (error) {
       toast.error("Failed to delete event.");
-      // 3. Revert on failure
       setDayEvents(previousEvents);
+    }
+  };
+
+  const handleAddNote = (
+    resourceId: string,
+    date: string,
+    shift: ShiftType
+  ) => {
+    const newNote: SchedulerNote = {
+      id: `temp-${Date.now()}`,
+      resourceId,
+      date,
+      shift,
+      text: "",
+    };
+    setNotes((prev) => [...prev, newNote]);
+  };
+
+  const handleSaveNote = async (noteId: string, newText: string) => {
+    const isNewNote = noteId.startsWith("temp-");
+    const noteToSave = notes.find((n) => n.id === noteId);
+    if (!noteToSave) return;
+    if (isNewNote) {
+      try {
+        if (!teamId) throw new Error("Team ID not found");
+        const { id, ...noteData } = noteToSave;
+        await createNote({ ...noteData, text: newText }, teamId);
+        router.refresh();
+      } catch (error) {
+        toast.error("Failed to save note.");
+        setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      }
+    } else {
+      const previousNotes = notes;
+      setNotes((prev) =>
+        prev.map((n) => (n.id === noteId ? { ...n, text: newText } : n))
+      );
+      try {
+        await updateNote(noteId, newText);
+      } catch (error) {
+        toast.error("Failed to update note.");
+        setNotes(previousNotes);
+      }
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    const previousNotes = notes;
+    setNotes((prev) => prev.filter((n) => n.id !== noteId));
+    try {
+      await deleteNote(noteId);
+    } catch (error) {
+      toast.error("Failed to delete note.");
+      setNotes(previousNotes);
+    }
+  };
+
+  const removeAssignment = async (assignmentId: string) => {
+    const previousAssignments = assignments;
+    setAssignments((prev) => prev.filter((a) => a.id !== assignmentId));
+    try {
+      await deleteAssignment(assignmentId);
+    } catch (error) {
+      toast.error("Failed to remove assignment.");
+      setAssignments(previousAssignments);
     }
   };
 
@@ -194,83 +221,6 @@ export default function SchedulerPage() {
     }
     setCurrentDate(newDate);
   };
-  // In app/scheduler/page.tsx
-
-  // This handler just creates the note in the UI
-  const handleAddNote = (
-    resourceId: string,
-    date: string,
-    shift: ShiftType
-  ) => {
-    const newNote: SchedulerNote = {
-      id: `temp-${Date.now()}`, // Give it a temporary ID
-      resourceId,
-      date,
-      shift,
-      text: "",
-    };
-    setNotes((prev) => [...prev, newNote]);
-  };
-
-  // This new handler handles both creating and updating
-  const handleSaveNote = async (noteId: string, newText: string) => {
-    const isNewNote = noteId.startsWith("temp-");
-    const noteToSave = notes.find((n) => n.id === noteId);
-
-    if (!noteToSave) return;
-
-    // Logic for CREATING a new note
-    if (isNewNote) {
-      try {
-        if (!teamId) throw new Error("Team ID not found");
-        const { id, ...noteData } = noteToSave;
-        const savedNote = await createNote(
-          { ...noteData, text: newText },
-          teamId
-        );
-
-        // --- THIS IS THE NEW DEBUG LOG ---
-        console.log("--- DEBUG: Note returned from database after CREATE ---");
-        console.log(savedNote);
-        // ------------------------------------
-
-        setNotes((prev) => prev.map((n) => (n.id === noteId ? savedNote : n)));
-        router.refresh();
-      } catch (error) {
-        console.error("Failed to save note:", error); // Log the actual error
-        toast.error("Failed to save note.");
-        setNotes((prev) => prev.filter((n) => n.id !== noteId));
-      }
-    } else {
-      // Logic for UPDATING an existing note
-      const previousNotes = notes;
-      setNotes((prev) =>
-        prev.map((n) => (n.id === noteId ? { ...n, text: newText } : n))
-      );
-      try {
-        const updatedNote = await updateNote(noteId, newText);
-
-        // --- THIS IS THE NEW DEBUG LOG ---
-        console.log("--- DEBUG: Note returned from database after UPDATE ---");
-        console.log(updatedNote);
-        // ------------------------------------
-      } catch (error) {
-        toast.error("Failed to update note.");
-        setNotes(previousNotes);
-      }
-    }
-  };
-
-  const handleDeleteNote = async (noteId: string) => {
-    const previousNotes = notes;
-    setNotes((prev) => prev.filter((n) => n.id !== noteId));
-    try {
-      await deleteNote(noteId);
-    } catch (error) {
-      toast.error("Failed to delete note.");
-      setNotes(previousNotes);
-    }
-  };
 
   const handleItemDrop = async (
     item: WorkItem | Assignment,
@@ -279,12 +229,11 @@ export default function SchedulerPage() {
     targetDate: string,
     targetShift: ShiftType
   ) => {
-    // Case 1: An EXISTING assignment card from the grid was moved
     if (type === "ASSIGNMENT_CARD") {
       const movedAssignment = item as Assignment;
-      const previousAssignments = assignments; // Back up state for rollback
+      const previousAssignments = assignments;
 
-      // Optimistic UI update (this part stays the same)
+      // Optimistic UI update
       setAssignments((prev) =>
         prev.map((a) =>
           a.id === movedAssignment.id
@@ -298,7 +247,7 @@ export default function SchedulerPage() {
         )
       );
 
-      // Call the database to persist the change
+      // Call database to persist the change
       try {
         await updateAssignment(movedAssignment.id, {
           resourceId: targetResourceId,
@@ -307,26 +256,22 @@ export default function SchedulerPage() {
         });
       } catch (error) {
         toast.error("Failed to move assignment.");
-        setAssignments(previousAssignments); // Revert on failure
+        setAssignments(previousAssignments); // Revert on error
       }
       return;
     }
 
-    // Case 2: A NEW item from the toolbox was dropped
     if (type === "WORK_ITEM") {
       const workItem = item as WorkItem;
-
-      // Determine the type of assignment being created
       let assignmentType: "project" | "equipment" | "vehicle" | "absence";
+
       if (workItem.type === "project") {
         assignmentType = "project";
       } else if (workItem.type === "equipment") {
         assignmentType = "equipment";
       } else if (workItem.type === "vehicle") {
         assignmentType = "vehicle";
-      } else if (workItem.type === "absence") {
-        assignmentType = "absence";
-      } else {
+      } else if (workItem.type === "personnel") {
         const targetResource = allResources.find(
           (r) => r.id === targetResourceId
         );
@@ -337,83 +282,77 @@ export default function SchedulerPage() {
         } else {
           return;
         }
+      } else if (workItem.type === "absence") {
+        assignmentType = "absence";
+      } else {
+        return;
       }
 
-      // --- BUSINESS RULE CHECKS ---
-
-      // RULE 1: A specific asset or vehicle cannot be assigned to more than one person in the same shift.
-      if (assignmentType === "equipment" || assignmentType === "vehicle") {
-        const itemToCheckId =
-          viewType === "personnel" || viewType === "all"
-            ? workItem.id
-            : targetResourceId;
-        const conflict = assignments.find(
-          (a) =>
-            a.workItemId === itemToCheckId &&
-            a.date === targetDate &&
-            a.shift === targetShift
-        );
-
-        if (conflict) {
-          const itemToAssign = allResources.find((r) => r.id === itemToCheckId);
-          const assignedTo = allResources.find(
-            (r) => r.id === conflict.resourceId
-          );
+      // --- CORRECTED BUSINESS RULE CHECKS ---
+      if (viewType === "personnel" || viewType === "all") {
+        if (assignmentType === "equipment" || assignmentType === "vehicle") {
+          if (
+            assignments.some(
+              (a) =>
+                a.workItemId === workItem.id &&
+                a.date === targetDate &&
+                a.shift === targetShift
+            )
+          ) {
+            toast.error(`${workItem.name} is already assigned in this shift.`);
+            return;
+          }
+        }
+      } else {
+        // This is the block that was missing
+        // Check if the equipment/vehicle is already assigned to someone
+        if (
+          assignments.some(
+            (a) =>
+              a.workItemId === targetResourceId &&
+              a.date === targetDate &&
+              a.shift === targetShift
+          )
+        ) {
+          toast.error(`This resource already has an assignment in this shift.`);
+          return;
+        }
+        // Check if the person is already assigned to other equipment/vehicles
+        if (
+          assignments.some(
+            (a) =>
+              a.resourceId === workItem.id &&
+              a.date === targetDate &&
+              a.shift === targetShift &&
+              a.assignmentType === assignmentType
+          )
+        ) {
           toast.error(
-            `${itemToAssign?.name || "This item"} is already assigned to ${assignedTo?.name || "someone"} in this shift.`
+            `${workItem.name} is already assigned to other ${assignmentType} in this shift.`
           );
           return;
         }
       }
 
-      // Get the person who is receiving the assignment and their existing assignments for the shift.
-      const personToAssignId =
-        viewType === "personnel" || viewType === "all"
-          ? targetResourceId
-          : workItem.id;
-      const assignmentsForPerson = assignments.filter(
-        (a) =>
-          a.resourceId === personToAssignId &&
-          a.date === targetDate &&
-          a.shift === targetShift
-      );
-      const personName =
-        allResources.find((r) => r.id === personToAssignId)?.name ||
-        "This person";
+      // --- START: CORRECTED ID ASSIGNMENT LOGIC ---
+      let finalWorkItemId = workItem.id;
+      let finalResourceId = targetResourceId;
 
-      // RULE 2: A person can only have ONE project assignment.
-      if (assignmentType === "project") {
-        if (assignmentsForPerson.some((a) => a.assignmentType === "project")) {
-          toast.error(
-            `${personName} is already assigned to a project in this shift.`
-          );
-          return;
-        }
+      // The special case: dragging a person onto equipment/vehicle.
+      // Only in this case do we swap the IDs.
+      if (
+        workItem.type === "personnel" &&
+        (viewType === "equipment" || viewType === "vehicles")
+      ) {
+        finalWorkItemId = targetResourceId;
+        finalResourceId = workItem.id;
       }
-
-      // RULE 3: A person can only have ONE vehicle assignment.
-      if (assignmentType === "vehicle") {
-        if (assignmentsForPerson.some((a) => a.assignmentType === "vehicle")) {
-          toast.error(
-            `${personName} is already assigned to a vehicle in this shift.`
-          );
-          return;
-        }
-      }
-
-      // --- All checks passed, proceed to create the assignment ---
-
-      const finalWorkItemId =
-        viewType === "personnel" || viewType === "all"
-          ? workItem.id
-          : targetResourceId;
-      const finalResourceId =
-        viewType === "personnel" || viewType === "all"
-          ? targetResourceId
-          : workItem.id;
+      // For all other cases, including dragging an absence onto any resource,
+      // the workItem is the item, and the resource is the target cell. No swap needed.
+      // --- END: CORRECTED ID ASSIGNMENT LOGIC ---
 
       const tempId = `temp-${Date.now()}`;
-      const newAssignmentData: Assignment = {
+      const newAssignment: Assignment = {
         id: tempId,
         workItemId: finalWorkItemId,
         resourceId: finalResourceId,
@@ -423,43 +362,26 @@ export default function SchedulerPage() {
         duration: workItem.duration || 1,
       };
 
-      setAssignments((prev) => [...prev, newAssignmentData]);
+      setAssignments((prev) => [...prev, newAssignment]);
       try {
         if (!teamId) throw new Error("Team ID not found");
-        const createdAssignment = await createAssignment(
-          newAssignmentData,
-          teamId
+
+        const targetResource = allResources.find(
+          (r) => r.id === targetResourceId
         );
-        setAssignments((prevAssignments) =>
-          prevAssignments.map((a) => (a.id === tempId ? createdAssignment : a))
-        );
+        if (!targetResource) throw new Error("Target resource not found");
+
+        await createAssignment(newAssignment, teamId, targetResource.type);
+        router.refresh();
       } catch (error) {
+        console.error("Failed to save assignment:", error);
         toast.error("Failed to save assignment.");
         setAssignments((prev) => prev.filter((a) => a.id !== tempId));
       }
     }
   };
 
-  const removeAssignment = async (assignmentId: string) => {
-    const previousAssignments = assignments;
-
-    // Step 1: Optimistically remove the assignment from the UI
-    setAssignments((prev) => prev.filter((a) => a.id !== assignmentId));
-
-    // Step 2: Call the database to delete the record
-    try {
-      await deleteAssignment(assignmentId);
-    } catch (error) {
-      console.error("Failed to delete assignment:", error);
-      toast.error("Failed to remove assignment.");
-      // Step 3: If the database call fails, revert the UI to its previous state
-      setAssignments(previousAssignments);
-    }
-  };
-
-  const [teamId, setTeamId] = useState<string | null>(null);
-
-  // --- MEMOIZED CALCULATIONS ---
+  // --- MEMOIZED CALCULATIONS & DERIVED STATE ---
   const visibleDates = useMemo(() => {
     const start = new Date(currentDate);
     const dates: Date[] = [];
@@ -473,8 +395,9 @@ export default function SchedulerPage() {
         const firstDayOfMonth = new Date(year, month, 1);
         const lastDayOfMonth = new Date(year, month + 1, 0);
         let current = new Date(firstDayOfMonth);
-        current.setDate(current.getDate() - (current.getDay() || 7) + 1);
-        while (current <= lastDayOfMonth || current.getDay() !== 1) {
+        current.setDate(current.getDate() - current.getDay()); // Changed for Sunday start
+        while (current <= lastDayOfMonth || current.getDay() !== 0) {
+          // Changed for Sunday start
           dates.push(new Date(current));
           current.setDate(current.getDate() + 1);
           if (dates.length >= 42) break;
@@ -482,7 +405,7 @@ export default function SchedulerPage() {
         break;
       default:
         const startOfWeek = new Date(start);
-        startOfWeek.setDate(start.getDate() - (start.getDay() || 7) + 1);
+        startOfWeek.setDate(start.getDate() - start.getDay()); // Changed for Sunday start
         for (let i = 0; i < 14; i++) {
           const date = new Date(startOfWeek);
           date.setDate(startOfWeek.getDate() + i);
@@ -494,49 +417,71 @@ export default function SchedulerPage() {
   }, [currentDate, timeView]);
 
   const draggableItems = useMemo((): WorkItem[] => {
+    // Helper to get absences for the current view, mapping 'vehicles' to 'vehicle'
+    const getAbsencesForView = (currentView: ResourceType) => {
+      const categoryForView =
+        currentView === "vehicles" ? "vehicle" : currentView;
+      return allWorkItems.filter(
+        (item) => item.type === "absence" && item.category === categoryForView
+      );
+    };
+
     switch (viewType) {
       case "equipment":
       case "vehicles":
-        return allResources
-          .filter((resource) => resource.type === "personnel")
+        // Get personnel to drag onto equipment/vehicles
+        const personnelAsWorkItems = allResources
+          .filter((r) => r.type === "personnel")
           .map(
-            (resource): WorkItem => ({
-              id: resource.id,
-              name: resource.name,
+            (r): WorkItem => ({
+              id: r.id,
+              name: r.name,
               type: "personnel",
-              color: "bg-blue-500", // Ensure color is always added
+              color: "bg-blue-500",
             })
           );
+        // Get only the absences relevant to this resource type
+        const relevantAbsences = getAbsencesForView(viewType);
+        return [...personnelAsWorkItems, ...relevantAbsences];
+
       case "personnel":
+        const equipmentAsWorkItems = allResources
+          .filter((r) => r.type === "equipment")
+          .map(
+            (r): WorkItem => ({
+              id: r.id,
+              name: r.name,
+              type: "equipment",
+              color: "bg-purple-500",
+            })
+          );
+        const vehiclesAsWorkItems = allResources
+          .filter((r) => r.type === "vehicles")
+          .map(
+            (r): WorkItem => ({
+              id: r.id,
+              name: r.name,
+              type: "vehicle",
+              color: "bg-green-500",
+            })
+          );
+        const projectItems = allWorkItems.filter(
+          (item) => item.type === "project"
+        );
+        // Get only absences for personnel
+        const personnelAbsences = getAbsencesForView("personnel");
+
         return [
-          ...allResources
-            .filter((resource) => resource.type === "equipment")
-            .map(
-              (resource): WorkItem => ({
-                id: resource.id,
-                name: resource.name,
-                type: "equipment",
-                color: "bg-purple-500", // Ensure color is always added
-              })
-            ),
-          ...allResources
-            .filter((resource) => resource.type === "vehicles")
-            .map(
-              (resource): WorkItem => ({
-                id: resource.id,
-                name: resource.name,
-                type: "vehicle",
-                color: "bg-green-500", // Ensure color is always added
-              })
-            ),
-          // Use allWorkItems here to get projects and absences
-          ...allWorkItems.filter(
-            (item) => item.type === "project" || item.type === "absence"
-          ),
+          ...equipmentAsWorkItems,
+          ...vehiclesAsWorkItems,
+          ...projectItems,
+          ...personnelAbsences,
         ];
-      default:
-        // Default to showing projects from allWorkItems
-        return allWorkItems.filter((item) => item.type === "project");
+
+      default: // "all" view - show projects and all absences
+        return allWorkItems.filter(
+          (item) => item.type === "project" || item.type === "absence"
+        );
     }
   }, [viewType, allResources, allWorkItems]);
 
@@ -554,20 +499,17 @@ export default function SchedulerPage() {
     );
   }, [draggableItems]);
 
-  const isReadOnly = currentUserRole !== "team_admin";
-
   const filteredResources =
     viewType === "all"
       ? allResources
       : allResources.filter((resource) => resource.type === viewType);
+  const isReadOnly = currentUserRole !== "team_admin";
 
   // --- JSX RETURN ---
-
   return (
     <DndProvider backend={HTML5Backend}>
       <CustomDragLayer />
       <div className="p-8">
-        {/* Main Page Container */}
         <div className="max-w-7xl mx-auto">
           {/* Page Header */}
           <div className="flex justify-between items-center mb-8">
@@ -580,15 +522,9 @@ export default function SchedulerPage() {
                   if (value) setTimeView(value);
                 }}
               >
-                <ToggleGroupItem value="day" aria-label="Toggle day">
-                  Day
-                </ToggleGroupItem>
-                <ToggleGroupItem value="week" aria-label="Toggle week">
-                  Week
-                </ToggleGroupItem>
-                <ToggleGroupItem value="month" aria-label="Toggle month">
-                  Month
-                </ToggleGroupItem>
+                <ToggleGroupItem value="day">Day</ToggleGroupItem>
+                <ToggleGroupItem value="week">Week</ToggleGroupItem>
+                <ToggleGroupItem value="month">Month</ToggleGroupItem>
               </ToggleGroup>
             </div>
             <div className="flex items-center gap-2">
@@ -620,27 +556,23 @@ export default function SchedulerPage() {
           <div className="mb-4 p-4 bg-white rounded-lg shadow border">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
               <div className="lg:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Drag to Schedule
+                </label>
                 <div className="flex flex-wrap gap-2 items-center">
-                  <span className="text-sm text-gray-500 mr-2">
-                    Drag to schedule:
-                  </span>
                   {!isReadOnly &&
-                    Object.entries(groupedItems).map(
-                      (
-                        [type, items] // <-- Add !isReadOnly check
-                      ) => (
-                        <ToolboxPopover
-                          key={type}
-                          title={type}
-                          items={items}
-                          trigger={
-                            <Button variant="outline" size="sm">
-                              {type}
-                            </Button>
-                          }
-                        />
-                      )
-                    )}
+                    Object.entries(groupedItems).map(([type, items]) => (
+                      <ToolboxPopover
+                        key={type}
+                        title={type}
+                        items={items}
+                        trigger={
+                          <Button variant="outline" size="sm">
+                            {type}
+                          </Button>
+                        }
+                      />
+                    ))}
                 </div>
               </div>
               <div>
@@ -689,8 +621,6 @@ export default function SchedulerPage() {
             </div>
           </div>
 
-          {/* Main Scheduler Grid */}
-          {/* This wrapper div now has the consistent styling */}
           {/* Main Scheduler Grid */}
           <div className="bg-white rounded-lg shadow">
             {isLoading ? (
