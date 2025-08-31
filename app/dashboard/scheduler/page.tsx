@@ -338,8 +338,6 @@ export default function SchedulerPage() {
       let finalWorkItemId = workItem.id;
       let finalResourceId = targetResourceId;
 
-      // The special case: dragging a person onto equipment/vehicle.
-      // Only in this case do we swap the IDs.
       if (
         workItem.type === "personnel" &&
         (viewType === "equipment" || viewType === "vehicles")
@@ -371,6 +369,7 @@ export default function SchedulerPage() {
         );
         if (!targetResource) throw new Error("Target resource not found");
 
+        // Corrected: Added the third argument 'targetResource.type'
         await createAssignment(newAssignment, teamId, targetResource.type);
         router.refresh();
       } catch (error) {
