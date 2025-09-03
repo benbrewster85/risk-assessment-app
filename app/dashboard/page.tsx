@@ -17,6 +17,7 @@ import {
   BookOpen,
   Truck,
   Calendar,
+  Briefcase,
   ClipboardList, // Added missing icon
   MapPin, // Added missing icon
 } from "lucide-react";
@@ -103,12 +104,15 @@ const NextJob = ({ job }: { job: NextJobDetails | null }) => {
 const StatusWidgets = ({
   issueCount,
   messageCount,
+  kitCount,
 }: {
   issueCount: number;
   messageCount: number;
+  kitCount: number;
 }) => {
   return (
     <div className="space-y-4">
+      {/* Action Items */}
       <Link href="/dashboard/action-items">
         <div className="flex items-center justify-between p-4 bg-white rounded-lg shadow cursor-pointer hover:bg-gray-50 transition-colors">
           <div className="flex items-center">
@@ -120,6 +124,7 @@ const StatusWidgets = ({
           </span>
         </div>
       </Link>
+      {/* Messages */}
       <Link href="/dashboard/messages">
         <div className="flex items-center justify-between p-4 bg-white rounded-lg shadow cursor-pointer hover:bg-gray-50 transition-colors">
           <div className="flex items-center">
@@ -129,6 +134,20 @@ const StatusWidgets = ({
           <span className="bg-blue-500 text-white text-sm font-bold rounded-full h-6 w-6 flex items-center justify-center">
             {messageCount}
           </span>
+        </div>
+      </Link>
+      {/* My Kit */}
+      <Link href="/dashboard/my-kit">
+        <div className="flex items-center justify-between p-4 bg-white rounded-lg shadow cursor-pointer hover:bg-gray-50 transition-colors">
+          <div className="flex items-center">
+            <Briefcase className="text-gray-500" size={24} />
+            <span className="ml-4 text-lg font-medium">My Kit</span>
+          </div>
+          {kitCount > 0 && (
+            <span className="bg-gray-600 text-white text-sm font-bold rounded-full h-6 w-6 flex items-center justify-center">
+              {kitCount}
+            </span>
+          )}
         </div>
       </Link>
     </div>
@@ -156,6 +175,11 @@ export default async function Dashboard() {
     "get_my_unread_messages_count"
   );
   const { data: nextJob } = await supabase.rpc("get_my_next_job");
+
+  const { count: assignedItemCount } = await supabase
+    .from("assets")
+    .select("*", { count: "exact", head: true })
+    .eq("current_assignee_id", user.id);
 
   // NEW: Fetch data required for the modals
   const { data: userProfile } = await supabase
@@ -203,6 +227,7 @@ export default async function Dashboard() {
             <StatusWidgets
               issueCount={openIssuesCount || 0}
               messageCount={unreadMessagesCount || 0}
+              kitCount={assignedItemCount || 0} // <-- ADD THIS PROP
             />
           </div>
         </div>

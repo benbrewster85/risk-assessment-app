@@ -3,71 +3,76 @@ import { Resource, WorkItem, Assignment, SchedulerNote, DayEvent, ShiftType, Res
 
 const supabase = createClient();
 
-// In lib/supabase/scheduler.ts
+// This interface defines the shape of the data returned by the function
+export interface SchedulableResourcesData {
+  resources: Resource[];
+  filterOptions: {
+    jobRoles: { id: string; name: string }[];
+    subTeams: { id: string; name: string }[];
+    lineManagers: { id: string; name: string }[];
+    assetCategories: { id: string; name: string }[];
+  };
+}
 
 // Fetches all people, equipment, and vehicles and formats them as 'Resource' objects
-export async function getSchedulableResources(teamId: string): Promise<Resource[]> {
-  // --- This part for fetching profiles remains the same ---
+export async function getSchedulableResources(teamId: string): Promise<SchedulableResourcesData> {
+  // 1. Fetch profiles with new fields
   const { data: profiles, error: pError } = await supabase
     .from('profiles')
-    .select('id, first_name, last_name')
+    .select('id, first_name, last_name, job_role_id, sub_team_id, line_manager_id')
     .eq('team_id', teamId);
   if (pError) throw pError;
 
+  // 2. Fetch related data for filter dropdowns
+  const { data: jobRoles, error: jError } = await supabase.from('job_roles').select('id, name').eq('team_id', teamId);
+  if (jError) throw jError;
 
-
-  // =================================================================
-  // START: UPDATED EQUIPMENT FETCHING LOGIC
-  // =================================================================
-
-  // Step 1: Get the IDs of all 'primary' asset categories for the team.
-  const { data: primaryCategoryIds, error: cError } = await supabase
-    .from('asset_categories')
-    .select('id')
-    .eq('team_id', teamId)
-    .eq('asset_category_class', 'Primary');
+  const { data: subTeams, error: sError } = await supabase.from('sub_teams').select('id, name').eq('team_id', teamId);
+  if (sError) throw sError;
   
+  const { data: assets, error: aError } = await supabase.from('assets').select('id, system_id, category_id').eq('team_id', teamId);
+  if (aError) throw aError;
+  
+  // ADDED: Fetch Asset Categories for the filter dropdown
+  const { data: assetCategories, error: cError } = await supabase.from('asset_categories').select('id, name').eq('team_id', teamId);
   if (cError) throw cError;
 
-  // If there are no primary categories, we can stop here to avoid an error.
-  if (!primaryCategoryIds || primaryCategoryIds.length === 0) {
-    // This part for fetching vehicles remains the same
-    const { data: vehicles, error: vError } = await supabase.from('vehicles').select('id, registration_number').eq('team_id', teamId);
-    if (vError) throw vError;
-    const personnel: Resource[] = profiles?.map((p: any) => ({ id: p.id, name: `${p.first_name || ''} ${p.last_name || ''}`.trim(), type: 'personnel' })) || [];
-    const allVehicles: Resource[] = vehicles?.map((v: any) => ({ id: v.id, name: v.registration_number, type: 'vehicles' })) || [];
-    return [...personnel, ...allVehicles]; // Return just personnel and vehicles
-  }
-
-  // Extract just the IDs into a simple array.
-  const categoryIdList = primaryCategoryIds.map(c => c.id);
-
-  // Step 2: Get all assets that belong to one of those categories using the .in() filter.
-  const { data: assets, error: aError } = await supabase
-    .from('assets')
-    .select('id, system_id')
-    .eq('team_id', teamId)
-    .in('category_id', categoryIdList); // <-- Use the list of IDs to filter assets
-
-  if (aError) throw aError;
-
-  // =================================================================
-  // END: UPDATED EQUIPMENT FETCHING LOGIC
-  // =================================================================
-
-  // --- This part for fetching vehicles remains the same ---
-  const { data: vehicles, error: vError } = await supabase
-    .from('vehicles')
-    .select('id, registration_number')
-    .eq('team_id', teamId);
+  const { data: vehicles, error: vError } = await supabase.from('vehicles').select('id, registration_number').eq('team_id', teamId);
   if (vError) throw vError;
 
-  // --- Mapping the results remains the same ---
-  const personnel: Resource[] = profiles?.map((p: any) => ({ id: p.id, name: `${p.first_name || ''} ${p.last_name || ''}`.trim(), type: 'personnel' })) || [];
-  const equipment: Resource[] = assets?.map((a: any) => ({ id: a.id, name: a.system_id, type: 'equipment' })) || [];
+  // 4. Map profiles to Resource type
+  const personnel: Resource[] = profiles?.map((p: any) => ({
+    id: p.id,
+    name: `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+    type: 'personnel',
+    job_role_id: p.job_role_id,
+    sub_team_id: p.sub_team_id,
+    line_manager_id: p.line_manager_id,
+  })) || [];
+
+  const equipment: Resource[] = assets?.map((a: any) => ({
+    id: a.id,
+    name: a.system_id,
+    type: 'equipment',
+    category_id: a.category_id,
+  })) || [];
+
   const allVehicles: Resource[] = vehicles?.map((v: any) => ({ id: v.id, name: v.registration_number, type: 'vehicles' })) || [];
 
-  return [...personnel, ...equipment, ...allVehicles];
+  const allResources = [...personnel, ...equipment, ...allVehicles];
+  
+  // Line managers are just other people in the team
+  const lineManagers = profiles?.map((p: any) => ({ id: p.id, name: `${p.first_name || ''} ${p.last_name || ''}`.trim() })) || [];
+
+  return {
+    resources: allResources,
+    filterOptions: {
+      jobRoles: jobRoles || [],
+      subTeams: subTeams || [],
+      lineManagers: lineManagers,
+      assetCategories: assetCategories || [], // ADDED: Include categories in the return object
+    },
+  };
 }
 
 // This function now accepts a teamId
@@ -75,12 +80,12 @@ export async function getSchedulableWorkItems(teamId: string): Promise<WorkItem[
   const { data: projects, error: pError } = await supabase
     .from('projects')
     .select('id, name')
-    .eq('team_id', teamId); // <-- The crucial filter
+    .eq('team_id', teamId);
   if (pError) throw pError;
 
   const { data: absences, error: aError } = await supabase
     .from('absence_types')
-    .select('id, name, color, category') // 1. Select the category
+    .select('id, name, color, category')
     .eq('team_id', teamId);
   if (aError) throw aError;
 
@@ -90,7 +95,7 @@ export async function getSchedulableWorkItems(teamId: string): Promise<WorkItem[
     name: a.name,
     type: 'absence',
     color: a.color,
-    category: a.category, // 2. Add the category to the WorkItem object
+    category: a.category,
   })) || [];
 
   return [...projectItems, ...absenceItems];
@@ -124,7 +129,7 @@ export async function getSchedulerData(teamId: string) {
         // Case 2: Project assignment
         assignmentType = 'project';
         workItemId = a.project_id;
-        resourceId = a.personnel_id; // Projects are assigned to people
+          resourceId = a.personnel_id;
     } else {
         // Case 3: Person assigned to Equipment/Vehicle
         resourceId = a.personnel_id;
@@ -146,7 +151,7 @@ export async function getSchedulerData(teamId: string) {
       assignmentType: assignmentType,
     };
     })
-    .filter((a): a is Assignment => !!a.resourceId && !!a.workItemId); // <-- This line removes any assignments with null IDs
+    .filter((a): a is Assignment => !!a.resourceId && !!a.workItemId);
 
   const notes: SchedulerNote[] = (rawNotes || []).map((n: any) => ({
     id: n.id,
@@ -184,7 +189,7 @@ export async function createAssignment(assignment: Assignment, teamId: string, t
     // Use Case 1: A work item (Project/Absence) is assigned TO a resource.
     if (assignment.assignmentType === 'project') {
       dataToInsert.project_id = assignment.workItemId;
-    } else { // absence
+    } else {
       dataToInsert.absence_type_id = assignment.workItemId;
     }
 
@@ -197,13 +202,12 @@ export async function createAssignment(assignment: Assignment, teamId: string, t
     dataToInsert.vehicle_id = assignment.resourceId;
   }
   } else if (assignment.assignmentType === 'equipment' || assignment.assignmentType === 'vehicle') {
-    // Use Case 2: A person is assigned TO a resource (Equipment/Vehicle).
-    dataToInsert.personnel_id = assignment.resourceId; // The resource being assigned is always a person here
+    dataToInsert.personnel_id = assignment.resourceId;
     
     if (assignment.assignmentType === 'equipment') {
-      dataToInsert.asset_id = assignment.workItemId; // The "work item" is the equipment
-    } else { // vehicle
-      dataToInsert.vehicle_id = assignment.workItemId; // The "work item" is the vehicle
+      dataToInsert.asset_id = assignment.workItemId;
+    } else {
+      dataToInsert.vehicle_id = assignment.workItemId;
     }
   }
 
@@ -251,7 +255,7 @@ export async function updateAssignment(
   const { error } = await supabase
     .from('schedule_assignments')
     .update({
-      personnel_id: updates.resourceId, // Maps the front-end prop to the DB column
+      personnel_id: updates.resourceId,
       assignment_date: updates.date,
       shift: updates.shift,
     })
@@ -268,7 +272,7 @@ export async function createDayEvent(dayEvent: DayEvent, teamId: string) {
 
   // Create a new object that perfectly matches the database table's columns
   const dataToInsert = {
-    event_date: eventData.date, // <-- The crucial fix: map `date` to `event_date`
+    event_date: eventData.date,
     text: eventData.text,
     type: eventData.type,
     color: eventData.color,

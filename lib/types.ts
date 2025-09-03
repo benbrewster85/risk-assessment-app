@@ -18,13 +18,14 @@ export type Project = {
 };
 export type ProjectListItem = { id: string; name: string; reference: string | null; last_edited_at: string; document_status: string | null;};
 export type Task = { id: string; project_id: string; team_id: string; title: string; description: string | null; status: 'Not Started' | 'In Progress' | 'Completed'; progress: number; sort_order: number; created_at: string; };
-export type TeamMember = { id: string; first_name: string | null; last_name: string | null; role: string; is_fleet_manager?: boolean; };
+export type TeamMember = { id: string; first_name: string | null; last_name: string | null; role: string; is_fleet_manager?: boolean;  };
 export type RiskAssessmentListItem = { id: string; name: string; description: string | null; created_at: string; };
 export type RiskAssessment = { id: string; name: string; description: string | null; project: Project; };
 export type RaEntry = { id: number; task_description: string | null; hazard_id: string; hazard: { name: string; } | null; risk_id: string; risk: { name: string; } | null; person_affected: string | null; initial_likelihood: number; initial_impact: number; control_measures: string | null; resultant_likelihood: number; resultant_impact: number; };
 export type Team = { id: string; name: string; logo_url: string | null; };
 export type Signatory = { user_id: string; };
 export type Signature = { user_id: string; signed_at: string; };
+
 
 export type AssetCategory = {
     id: string;
@@ -141,6 +142,10 @@ export interface Resource {
   name: string;
   type: ResourceType;
   avatar?: string;
+  job_role_id?: string | null;
+  sub_team_id?: string | null;
+  line_manager_id?: string | null;
+  category_id?: string | null;
 }
 
 

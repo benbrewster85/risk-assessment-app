@@ -1,5 +1,3 @@
-//let's try this again
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
@@ -28,8 +26,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ChevronLeft, ChevronRight, Filter as FilterIcon } from "lucide-react";
 import {
   getSchedulableResources,
   getSchedulableWorkItems,
@@ -46,6 +50,13 @@ import {
 import { getUserProfile } from "@/lib/supabase/profiles";
 
 type TimeView = "day" | "week" | "month";
+
+type ActiveFilters = {
+  jobRoleIds: string[];
+  subTeamIds: string[];
+  lineManagerIds: string[];
+  assetCategoryIds: string[];
+};
 
 export default function SchedulerPage() {
   // --- HOOKS ---
@@ -68,6 +79,21 @@ export default function SchedulerPage() {
   const [teamId, setTeamId] = useState<string | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
+  // New state for filters
+  const [filterOptions, setFilterOptions] = useState<{
+    jobRoles: { id: string; name: string }[];
+    subTeams: { id: string; name: string }[];
+    lineManagers: { id: string; name: string }[];
+    assetCategories: { id: string; name: string }[];
+  }>({ jobRoles: [], subTeams: [], lineManagers: [], assetCategories: [] });
+
+  const [activeFilters, setActiveFilters] = useState<ActiveFilters>({
+    jobRoleIds: [],
+    subTeamIds: [],
+    lineManagerIds: [],
+    assetCategoryIds: [],
+  });
+
   // --- DATA FETCHING ---
   useEffect(() => {
     const loadInitialData = async () => {
@@ -86,12 +112,16 @@ export default function SchedulerPage() {
         setTeamId(teamId);
         setCurrentUserRole(profile.role);
 
-        const resources = await getSchedulableResources(teamId);
+        const {
+          resources: fetchedResources,
+          filterOptions: fetchedFilterOptions,
+        } = await getSchedulableResources(teamId);
         const workItems = await getSchedulableWorkItems(teamId);
         const { assignments, notes, dayEvents } =
           await getSchedulerData(teamId);
 
-        setAllResources(resources);
+        setAllResources(fetchedResources);
+        setFilterOptions(fetchedFilterOptions);
         setAllWorkItems(workItems);
         setAssignments(assignments);
         setNotes(notes);
@@ -107,6 +137,16 @@ export default function SchedulerPage() {
   }, []);
 
   // --- HANDLER FUNCTIONS ---
+  const handleFilterChange = (filterKey: keyof ActiveFilters, id: string) => {
+    setActiveFilters((prev) => {
+      const currentValues = prev[filterKey];
+      const newValues = currentValues.includes(id)
+        ? currentValues.filter((val) => val !== id) // Remove if it exists
+        : [...currentValues, id]; // Add if it doesn't exist
+      return { ...prev, [filterKey]: newValues };
+    });
+  };
+
   const handleAddDayEvent = async (
     date: string,
     text: string,
@@ -234,8 +274,6 @@ export default function SchedulerPage() {
     if (type === "ASSIGNMENT_CARD") {
       const movedAssignment = item as Assignment;
       const previousAssignments = assignments;
-
-      // Optimistic UI update
       setAssignments((prev) =>
         prev.map((a) =>
           a.id === movedAssignment.id
@@ -248,8 +286,6 @@ export default function SchedulerPage() {
             : a
         )
       );
-
-      // Call database to persist the change
       try {
         await updateAssignment(movedAssignment.id, {
           resourceId: targetResourceId,
@@ -258,7 +294,7 @@ export default function SchedulerPage() {
         });
       } catch (error) {
         toast.error("Failed to move assignment.");
-        setAssignments(previousAssignments); // Revert on error
+        setAssignments(previousAssignments);
       }
       return;
     }
@@ -290,7 +326,6 @@ export default function SchedulerPage() {
         return;
       }
 
-      // --- CORRECTED BUSINESS RULE CHECKS ---
       if (viewType === "personnel" || viewType === "all") {
         if (assignmentType === "equipment" || assignmentType === "vehicle") {
           if (
@@ -306,8 +341,6 @@ export default function SchedulerPage() {
           }
         }
       } else {
-        // This is the block that was missing
-        // Check if the equipment/vehicle is already assigned to someone
         if (
           assignments.some(
             (a) =>
@@ -319,7 +352,6 @@ export default function SchedulerPage() {
           toast.error(`This resource already has an assignment in this shift.`);
           return;
         }
-        // Check if the person is already assigned to other equipment/vehicles
         if (
           assignments.some(
             (a) =>
@@ -336,7 +368,6 @@ export default function SchedulerPage() {
         }
       }
 
-      // --- START: CORRECTED ID ASSIGNMENT LOGIC ---
       let finalWorkItemId = workItem.id;
       let finalResourceId = targetResourceId;
 
@@ -379,7 +410,7 @@ export default function SchedulerPage() {
     }
   };
 
-  // --- MEMOIZED CALCULATIONS & DERIVED STATE ---
+  // --- MEMOIZED CALCULATIONS & DERIVED STATE (Must be before return statement) ---
   const visibleDates = useMemo(() => {
     const start = new Date(currentDate);
     const dates: Date[] = [];
@@ -393,7 +424,7 @@ export default function SchedulerPage() {
         const firstDayOfMonth = new Date(year, month, 1);
         const lastDayOfMonth = new Date(year, month + 1, 0);
         let current = new Date(firstDayOfMonth);
-        current.setDate(current.getDate() - current.getDay()); // Changed for Sunday start
+        current.setDate(current.getDate() - current.getDay());
         while (current <= lastDayOfMonth || current.getDay() !== 0) {
           // Changed for Sunday start
           dates.push(new Date(current));
@@ -403,7 +434,7 @@ export default function SchedulerPage() {
         break;
       default:
         const startOfWeek = new Date(start);
-        startOfWeek.setDate(start.getDate() - start.getDay()); // Changed for Sunday start
+        startOfWeek.setDate(start.getDate() - start.getDay());
         for (let i = 0; i < 14; i++) {
           const date = new Date(startOfWeek);
           date.setDate(startOfWeek.getDate() + i);
@@ -415,7 +446,6 @@ export default function SchedulerPage() {
   }, [currentDate, timeView]);
 
   const draggableItems = useMemo((): WorkItem[] => {
-    // Helper to get absences for the current view, mapping 'vehicles' to 'vehicle'
     const getAbsencesForView = (currentView: ResourceType) => {
       const categoryForView =
         currentView === "vehicles" ? "vehicle" : currentView;
@@ -476,7 +506,7 @@ export default function SchedulerPage() {
           ...personnelAbsences,
         ];
 
-      default: // "all" view - show projects and all absences
+      default:
         return allWorkItems.filter(
           (item) => item.type === "project" || item.type === "absence"
         );
@@ -497,10 +527,57 @@ export default function SchedulerPage() {
     );
   }, [draggableItems]);
 
-  const filteredResources =
-    viewType === "all"
-      ? allResources
-      : allResources.filter((resource) => resource.type === viewType);
+  const filteredResources = useMemo(() => {
+    let resources =
+      viewType === "all"
+        ? allResources
+        : allResources.filter((resource) => resource.type === viewType);
+
+    if (viewType === "personnel") {
+      const { jobRoleIds, subTeamIds, lineManagerIds } = activeFilters;
+      if (jobRoleIds.length > 0) {
+        resources = resources.filter(
+          (r) => r.job_role_id && jobRoleIds.includes(r.job_role_id)
+        );
+      }
+      if (subTeamIds.length > 0) {
+        resources = resources.filter(
+          (r) => r.sub_team_id && subTeamIds.includes(r.sub_team_id)
+        );
+      }
+      if (lineManagerIds.length > 0) {
+        resources = resources.filter(
+          (r) => r.line_manager_id && lineManagerIds.includes(r.line_manager_id)
+        );
+      }
+    }
+
+    if (viewType === "equipment") {
+      const { assetCategoryIds } = activeFilters;
+      if (assetCategoryIds.length > 0) {
+        resources = resources.filter(
+          (r) => r.category_id && assetCategoryIds.includes(r.category_id)
+        );
+      }
+    }
+
+    return resources;
+  }, [viewType, allResources, activeFilters]);
+
+  const activeFilterCount = useMemo(() => {
+    if (viewType === "personnel") {
+      return (
+        activeFilters.jobRoleIds.length +
+        activeFilters.subTeamIds.length +
+        activeFilters.lineManagerIds.length
+      );
+    }
+    if (viewType === "equipment") {
+      return activeFilters.assetCategoryIds.length;
+    }
+    return 0;
+  }, [viewType, activeFilters]);
+
   const isReadOnly = currentUserRole !== "team_admin";
 
   // --- JSX RETURN ---
@@ -552,7 +629,7 @@ export default function SchedulerPage() {
 
           {/* Controls & Toolbox */}
           <div className="mb-4 p-4 bg-white rounded-lg shadow border">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
               <div className="lg:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Drag to Schedule
@@ -573,6 +650,7 @@ export default function SchedulerPage() {
                     ))}
                 </div>
               </div>
+
               <div>
                 <label
                   htmlFor="viewType"
@@ -595,6 +673,155 @@ export default function SchedulerPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Filters
+                </label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full mt-1"
+                      disabled={
+                        viewType !== "personnel" && viewType !== "equipment"
+                      }
+                    >
+                      <FilterIcon className="w-4 h-4 mr-2" />
+                      Filter Resources
+                      {activeFilterCount > 0 && (
+                        <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-blue-600 rounded-full">
+                          {activeFilterCount}
+                        </span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-4">
+                    {viewType === "personnel" && (
+                      <div className="space-y-4">
+                        {/* Job Roles Filter */}
+                        <div className="space-y-2">
+                          <h4 className="font-medium">Job Role</h4>
+                          <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
+                            {filterOptions.jobRoles.map((role) => (
+                              <div
+                                key={role.id}
+                                className="flex items-center space-x-2 mb-1"
+                              >
+                                <Checkbox
+                                  id={`role-${role.id}`}
+                                  checked={activeFilters.jobRoleIds.includes(
+                                    role.id
+                                  )}
+                                  onCheckedChange={() =>
+                                    handleFilterChange("jobRoleIds", role.id)
+                                  }
+                                />
+                                <label
+                                  htmlFor={`role-${role.id}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {role.name}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        {/* Sub-Teams Filter */}
+                        <div className="space-y-2">
+                          <h4 className="font-medium">Sub-Team</h4>
+                          <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
+                            {filterOptions.subTeams.map((team) => (
+                              <div
+                                key={team.id}
+                                className="flex items-center space-x-2 mb-1"
+                              >
+                                <Checkbox
+                                  id={`team-${team.id}`}
+                                  checked={activeFilters.subTeamIds.includes(
+                                    team.id
+                                  )}
+                                  onCheckedChange={() =>
+                                    handleFilterChange("subTeamIds", team.id)
+                                  }
+                                />
+                                <label
+                                  htmlFor={`team-${team.id}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {team.name}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        {/* Line Managers Filter */}
+                        <div className="space-y-2">
+                          <h4 className="font-medium">Line Manager</h4>
+                          <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
+                            {filterOptions.lineManagers.map((manager) => (
+                              <div
+                                key={manager.id}
+                                className="flex items-center space-x-2 mb-1"
+                              >
+                                <Checkbox
+                                  id={`manager-${manager.id}`}
+                                  checked={activeFilters.lineManagerIds.includes(
+                                    manager.id
+                                  )}
+                                  onCheckedChange={() =>
+                                    handleFilterChange(
+                                      "lineManagerIds",
+                                      manager.id
+                                    )
+                                  }
+                                />
+                                <label
+                                  htmlFor={`manager-${manager.id}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {manager.name}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {viewType === "equipment" && (
+                      <div className="space-y-2">
+                        <h4 className="font-medium">Equipment Type</h4>
+                        <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
+                          {filterOptions.assetCategories.map((cat) => (
+                            <div
+                              key={cat.id}
+                              className="flex items-center space-x-2 mb-1"
+                            >
+                              <Checkbox
+                                id={`cat-${cat.id}`}
+                                checked={activeFilters.assetCategoryIds.includes(
+                                  cat.id
+                                )}
+                                onCheckedChange={() =>
+                                  handleFilterChange("assetCategoryIds", cat.id)
+                                }
+                              />
+                              <label
+                                htmlFor={`cat-${cat.id}`}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                              >
+                                {cat.name}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
+              </div>
+              {/* --- END: DYNAMIC FILTER COMPONENT --- */}
+
               <div>
                 <label
                   htmlFor="shiftView"
@@ -619,7 +846,6 @@ export default function SchedulerPage() {
             </div>
           </div>
 
-          {/* Main Scheduler Grid */}
           <div className="bg-white rounded-lg shadow">
             {isLoading ? (
               <div className="p-8 text-center text-gray-500">

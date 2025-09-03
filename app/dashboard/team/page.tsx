@@ -8,7 +8,12 @@ import LibraryPage from "@/components/LibraryPage";
 import TeamSettingsTab from "@/components/TeamSettingsTab";
 import { useRouter } from "next/navigation";
 
-type EnrichedTeamMember = TeamMember & { is_fleet_manager?: boolean };
+type EnrichedTeamMember = TeamMember & {
+  is_fleet_manager?: boolean;
+  job_role_id?: string | null;
+  sub_team_id?: string | null;
+  line_manager_id?: string | null;
+};
 type LibraryItem = { id: string; name: string; is_system_status?: boolean };
 
 export default function TeamPage() {
@@ -25,12 +30,15 @@ export default function TeamPage() {
 
   // MOVED a new state for competencies here
   const [competencies, setCompetencies] = useState<LibraryItem[]>([]);
-
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("user");
   const [isInviting, setIsInviting] = useState(false);
+
+  // JOB ROLES AND SUB TEAMS
+  const [jobRoles, setJobRoles] = useState<LibraryItem[]>([]);
+  const [subTeams, setSubTeams] = useState<LibraryItem[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -57,10 +65,14 @@ export default function TeamPage() {
             categoriesResult,
             statusesResult,
             competenciesResult,
+            jobRolesResult,
+            subTeamsResult,
           ] = await Promise.all([
             supabase
               .from("profiles")
-              .select("id, first_name, last_name, role, is_fleet_manager")
+              .select(
+                "id, first_name, last_name, role, is_fleet_manager, job_role_id, sub_team_id,line_manager_id"
+              )
               .eq("team_id", teamId)
               .order("last_name", { ascending: true }),
             supabase
@@ -92,6 +104,16 @@ export default function TeamPage() {
               .eq("team_id", teamId)
               .eq("is_archived", false)
               .order("name"),
+            supabase
+              .from("job_roles")
+              .select("id, name")
+              .eq("team_id", teamId)
+              .order("name"),
+            supabase
+              .from("sub_teams")
+              .select("id, name")
+              .eq("team_id", teamId)
+              .order("name"),
           ]);
 
           if (membersResult.data) setTeamMembers(membersResult.data);
@@ -108,6 +130,9 @@ export default function TeamPage() {
           if (statusesResult.data) setAssetStatuses(statusesResult.data);
           // ADDED: Set competencies state
           if (competenciesResult.data) setCompetencies(competenciesResult.data);
+          // SET JOB ROLES AND SUB TEAMS
+          if (jobRolesResult.data) setJobRoles(jobRolesResult.data);
+          if (subTeamsResult.data) setSubTeams(subTeamsResult.data);
         }
       }
       setLoading(false);
@@ -159,6 +184,29 @@ export default function TeamPage() {
           m.id === userId ? { ...m, role: newRole } : m
         )
       );
+    }
+  };
+
+  const handleMemberUpdate = async (
+    userId: string,
+    field: "job_role_id" | "sub_team_id" | "line_manager_id",
+    value: string | null
+  ) => {
+    // Optimistically update the UI
+    setTeamMembers((current) =>
+      current.map((m) => (m.id === userId ? { ...m, [field]: value } : m))
+    );
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ [field]: value })
+      .eq("id", userId);
+
+    if (error) {
+      toast.error(`Failed to update user: ${error.message}`);
+      // Revert UI change on failure - you might want to refetch data here
+    } else {
+      toast.success("User updated successfully.");
     }
   };
 
@@ -270,7 +318,7 @@ export default function TeamPage() {
                           htmlFor="role"
                           className="block text-sm font-medium text-gray-700"
                         >
-                          Role
+                          Permission
                         </label>
                         <select
                           id="role"
@@ -291,29 +339,103 @@ export default function TeamPage() {
                       </button>
                     </form>
                   </div>
+
+                  {/* --- CORRECTED MEMBERS LIST --- */}
                   <div className="bg-white p-6 rounded-lg shadow">
                     <h2 className="text-2xl font-bold mb-4">Current Members</h2>
                     <ul className="divide-y divide-gray-200">
                       {teamMembers.map((member) => (
                         <li
                           key={member.id}
-                          className="py-4 flex justify-between items-center"
+                          className="py-4 grid grid-cols-1 md:grid-cols-3 gap-6 items-center"
                         >
+                          {/* Column 1: Member Info */}
                           <div>
                             <p className="font-medium">
                               {`${member.first_name || ""} ${member.last_name || ""}`.trim() ||
                                 "Unnamed User"}
                             </p>
-                            <p className="text-sm text-gray-500">
-                              {member.role}
+                            <p className="text-sm text-gray-500 capitalize">
+                              {member.role === "team_admin" ? "Admin" : "User"}
                             </p>
                           </div>
-                          <div className="flex items-center space-x-6">
+
+                          {/* Column 2: Assignments (Role, Team, Manager) */}
+                          <div className="grid grid-cols-1 gap-2">
+                            <select
+                              value={member.job_role_id || ""}
+                              onChange={(e) =>
+                                handleMemberUpdate(
+                                  member.id,
+                                  "job_role_id",
+                                  e.target.value || null
+                                )
+                              }
+                              className="block w-full rounded-md border-gray-300 shadow-sm text-sm"
+                              // REMOVED: disabled={member.id === currentUserId}
+                              aria-label="Job Role"
+                            >
+                              <option value="">No Job Role</option>
+                              {jobRoles.map((role) => (
+                                <option key={role.id} value={role.id}>
+                                  {role.name}
+                                </option>
+                              ))}
+                            </select>
+
+                            <select
+                              value={member.sub_team_id || ""}
+                              onChange={(e) =>
+                                handleMemberUpdate(
+                                  member.id,
+                                  "sub_team_id",
+                                  e.target.value || null
+                                )
+                              }
+                              className="block w-full rounded-md border-gray-300 shadow-sm text-sm"
+                              // REMOVED: disabled={member.id === currentUserId}
+                              aria-label="Sub-Team"
+                            >
+                              <option value="">No Sub-Team</option>
+                              {subTeams.map((team) => (
+                                <option key={team.id} value={team.id}>
+                                  {team.name}
+                                </option>
+                              ))}
+                            </select>
+
+                            {/* --- ADDED: Line Manager Dropdown --- */}
+                            <select
+                              value={member.line_manager_id || ""}
+                              onChange={(e) =>
+                                handleMemberUpdate(
+                                  member.id,
+                                  "line_manager_id",
+                                  e.target.value || null
+                                )
+                              }
+                              className="block w-full rounded-md border-gray-300 shadow-sm text-sm"
+                              // REMOVED: disabled={member.id === currentUserId}
+                              aria-label="Line Manager"
+                            >
+                              <option value="">No Line Manager</option>
+                              {teamMembers
+                                .filter((m) => m.id !== member.id)
+                                .map((manager) => (
+                                  <option key={manager.id} value={manager.id}>
+                                    {`${manager.first_name || ""} ${manager.last_name || ""}`.trim()}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+
+                          {/* Column 3: Permissions */}
+                          <div className="flex items-center justify-end space-x-4">
                             <div className="flex items-center">
                               <input
                                 id={`fleet-manager-${member.id}`}
                                 type="checkbox"
-                                className="h-4 w-4 rounded"
+                                className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
                                 checked={!!member.is_fleet_manager}
                                 onChange={(e) =>
                                   handleFleetManagerChange(
@@ -325,7 +447,7 @@ export default function TeamPage() {
                               />
                               <label
                                 htmlFor={`fleet-manager-${member.id}`}
-                                className="ml-2 text-sm"
+                                className="ml-2 text-sm text-gray-700"
                               >
                                 Fleet Manager
                               </label>
@@ -335,8 +457,9 @@ export default function TeamPage() {
                               onChange={(e) =>
                                 handleRoleChange(member.id, e.target.value)
                               }
-                              className="block w-40 rounded-md border-gray-300 shadow-sm"
-                              disabled={member.id === currentUserId}
+                              className="block w-32 rounded-md border-gray-300 shadow-sm text-sm"
+                              disabled={member.id === currentUserId} // KEPT for safety
+                              aria-label="Permission Level"
                             >
                               <option value="user">User</option>
                               <option value="team_admin">Admin</option>
@@ -346,6 +469,7 @@ export default function TeamPage() {
                       ))}
                     </ul>
                   </div>
+                  {/* --- END OF CORRECTION --- */}
                 </div>
               )}
               {activeTab === "library" && team && (
@@ -354,9 +478,11 @@ export default function TeamPage() {
                   risks={risks}
                   assetCategories={assetCategories}
                   assetStatuses={assetStatuses}
-                  competencies={competencies} // Pass the new prop
+                  competencies={competencies}
                   teamMembers={teamMembers}
                   teamId={team.id}
+                  jobRoles={jobRoles}
+                  subTeams={subTeams}
                 />
               )}
               {activeTab === "settings" && team && (

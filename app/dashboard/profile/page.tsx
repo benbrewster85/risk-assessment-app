@@ -36,6 +36,7 @@ export default function ProfilePage() {
   const [lastName, setLastName] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [teamId, setTeamId] = useState<string | null>(null);
+  const [isFetchingUrl, setIsFetchingUrl] = useState<string | null>(null);
 
   // States for the competencies feature
   const [teamCompetencies, setTeamCompetencies] = useState<Competency[]>([]);
@@ -140,7 +141,7 @@ export default function ProfilePage() {
     if (certificateFile) {
       const fileExt = certificateFile.name.split(".").pop();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      const path = `public/${user.id}/${fileName}`;
+      const path = `${user.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from("certificates")
@@ -205,6 +206,61 @@ export default function ProfilePage() {
     }
 
     setIsSubmitting(false);
+  };
+
+  const handleViewCertificate = async (
+    filePath: string | null,
+    competencyId: string
+  ) => {
+    if (!filePath) {
+      toast.error("No certificate file found.");
+      return;
+    }
+    setIsFetchingUrl(competencyId); // Set loading state for this specific button
+
+    try {
+      const { data, error } = await supabase.storage
+        .from("certificates")
+        .createSignedUrl(filePath, 60); // The URL will be valid for 60 seconds
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, "_blank"); // Open the URL in a new tab
+      }
+    } catch (error: any) {
+      toast.error(`Failed to get certificate: ${error.message}`);
+    } finally {
+      setIsFetchingUrl(null); // Clear loading state
+    }
+  };
+
+  const getExpiryStatus = (
+    expiryDate: string | null
+  ): "green" | "amber" | "red" | null => {
+    if (!expiryDate) {
+      return null; // No date, no indicator
+    }
+
+    const today = new Date();
+    const expiry = new Date(expiryDate);
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(today.getDate() + 30);
+
+    // To avoid issues with timezones, we'll compare dates only
+    today.setHours(0, 0, 0, 0);
+    expiry.setHours(0, 0, 0, 0);
+    thirtyDaysFromNow.setHours(0, 0, 0, 0);
+
+    if (expiry < today) {
+      return "red"; // Expired
+    }
+    if (expiry <= thirtyDaysFromNow) {
+      return "amber"; // Expiring within 30 days
+    }
+    return "green"; // Valid
   };
 
   if (loading) return <p className="p-8">Loading profile...</p>;
@@ -282,17 +338,68 @@ export default function ProfilePage() {
           <h2 className="text-2xl font-bold mb-4">My Competencies</h2>
 
           <ul className="divide-y divide-gray-200 mb-6">
-            {myCompetencies.map((comp) => (
-              <li key={comp.id} className="py-3">
-                <p className="font-medium">{comp.competency?.name}</p>
-                <p className="text-sm text-gray-500">
-                  Achieved: {new Date(comp.achieved_date).toLocaleDateString()}
-                  {/* FIXED: Corrected typo 'toLocaleDateDateString' -> 'toLocaleDateString' */}
-                  {comp.expiry_date &&
-                    ` | Expires: ${new Date(comp.expiry_date).toLocaleDateString()}`}
-                </p>
-              </li>
-            ))}
+            {myCompetencies.map((comp) => {
+              // Call the helper function for each competency
+              const status = getExpiryStatus(comp.expiry_date);
+
+              // Map status to a Tailwind CSS color class
+              const statusColorClass = status
+                ? {
+                    red: "bg-red-500",
+                    amber: "bg-yellow-500",
+                    green: "bg-green-500",
+                  }[status]
+                : ""; // If status is null, default to an empty string
+
+              return (
+                <li
+                  key={comp.id}
+                  className="py-3 flex justify-between items-center"
+                >
+                  <div className="flex items-center space-x-3">
+                    {/* Conditionally render the status dot */}
+                    {status && (
+                      <div
+                        className={`h-3 w-3 rounded-full ${statusColorClass}`}
+                        title={
+                          status === "red"
+                            ? "Expired"
+                            : status === "amber"
+                              ? "Expires within 30 days"
+                              : "Valid"
+                        }
+                      ></div>
+                    )}
+                    <div>
+                      <p className="font-medium">{comp.competency?.name}</p>
+                      <p className="text-sm text-gray-500">
+                        Achieved:{" "}
+                        {new Date(comp.achieved_date).toLocaleDateString()}
+                        {comp.expiry_date &&
+                          ` | Expires: ${new Date(comp.expiry_date).toLocaleDateString()}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {comp.certificate_file_path && (
+                    <button
+                      onClick={() =>
+                        handleViewCertificate(
+                          comp.certificate_file_path,
+                          comp.id
+                        )
+                      }
+                      disabled={isFetchingUrl === comp.id}
+                      className="py-1 px-3 border rounded-md text-sm text-gray-700 bg-gray-50 hover:bg-gray-100 disabled:bg-gray-200 disabled:cursor-wait"
+                    >
+                      {isFetchingUrl === comp.id
+                        ? "Loading..."
+                        : "View Certificate"}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
             {myCompetencies.length === 0 && (
               <p className="text-sm text-gray-500">
                 You have not added any competencies yet.
