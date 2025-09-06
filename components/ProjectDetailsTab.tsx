@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-hot-toast";
 import { Project, TeamMember } from "@/lib/types";
+import ColorPicker from "./ColorPicker";
 
 type ProjectDetailsTabProps = {
   project: Project;
@@ -45,6 +46,9 @@ export default function ProjectDetailsTab({
   const [jobDescription, setJobDescription] = useState(
     project.job_description || ""
   );
+  const [color, setColor] = useState(
+    project.color || "bg-slate-200 text-slate-800"
+  ); // <-- 2. Add color state
 
   useEffect(() => {
     setName(project.name);
@@ -56,6 +60,7 @@ export default function ProjectDetailsTab({
     setPmId(project.project_manager_id || "");
     setSlId(project.site_lead_id || "");
     setJobDescription(project.job_description || "");
+    setColor(project.color || "bg-slate-200 text-slate-800"); // <-- 2. Sync color state
   }, [project]);
 
   const handleSaveChanges = async (e: React.FormEvent) => {
@@ -71,6 +76,7 @@ export default function ProjectDetailsTab({
       site_lead_id: slId || null,
       location_address: address,
       job_description: jobDescription,
+      color: color, // <-- 3. Add color to the save payload
       last_edited_at: new Date().toISOString(),
     };
 
@@ -223,6 +229,16 @@ export default function ProjectDetailsTab({
                 ) : (
                   <p className="mt-2">{getMemberName(project.site_lead_id)}</p>
                 )}
+              </div>
+              <div className="mt-6">
+                <label className="block text-sm font-medium mb-2">
+                  Project Colour
+                </label>
+                <ColorPicker
+                  value={color}
+                  onChange={setColor}
+                  disabled={!isEditing}
+                />
               </div>
             </div>
           </div>

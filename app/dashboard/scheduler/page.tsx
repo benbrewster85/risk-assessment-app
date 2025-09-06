@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { DndProvider } from "react-dnd";
@@ -46,8 +46,13 @@ import {
   updateNote,
   deleteNote,
   updateAssignment,
+  createBulkAssignments,
 } from "@/lib/supabase/scheduler";
 import { getUserProfile } from "@/lib/supabase/profiles";
+import {
+  BulkAssignModal,
+  BulkAssignFormData,
+} from "@/components/BulkAssignModal";
 
 type TimeView = "day" | "week" | "month";
 
@@ -79,7 +84,6 @@ export default function SchedulerPage() {
   const [teamId, setTeamId] = useState<string | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
-  // New state for filters
   const [filterOptions, setFilterOptions] = useState<{
     jobRoles: { id: string; name: string }[];
     subTeams: { id: string; name: string }[];
@@ -94,55 +98,88 @@ export default function SchedulerPage() {
     assetCategoryIds: [],
   });
 
-  // --- DATA FETCHING ---
-  useEffect(() => {
-    const loadInitialData = async () => {
-      setIsLoading(true);
-      try {
-        const profile = await getUserProfile();
-        if (!profile || !profile.team_id) {
-          console.warn(
-            "User profile or team not found. Cannot load scheduler data."
-          );
-          setIsLoading(false);
-          return;
-        }
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] =
+    useState<Assignment | null>(null);
 
-        const teamId = profile.team_id;
-        setTeamId(teamId);
-        setCurrentUserRole(profile.role);
-
-        const {
-          resources: fetchedResources,
-          filterOptions: fetchedFilterOptions,
-        } = await getSchedulableResources(teamId);
-        const workItems = await getSchedulableWorkItems(teamId);
-        const { assignments, notes, dayEvents } =
-          await getSchedulerData(teamId);
-
-        setAllResources(fetchedResources);
-        setFilterOptions(fetchedFilterOptions);
-        setAllWorkItems(workItems);
-        setAssignments(assignments);
-        setNotes(notes);
-        setDayEvents(dayEvents);
-      } catch (error) {
-        console.error("Failed to load scheduler data:", error);
-        toast.error("Failed to load scheduler data.");
-      } finally {
+  const fetchData = useCallback(async () => {
+    try {
+      const profile = await getUserProfile();
+      if (!profile || !profile.team_id) {
+        console.warn("User profile or team not found.");
         setIsLoading(false);
+        return;
       }
-    };
-    loadInitialData();
-  }, []);
+      const currentTeamId = profile.team_id;
+      if (!teamId) setTeamId(currentTeamId);
+      if (!currentUserRole) setCurrentUserRole(profile.role);
+
+      const [resourceData, workItems, schedulerData] = await Promise.all([
+        getSchedulableResources(currentTeamId),
+        getSchedulableWorkItems(currentTeamId),
+        getSchedulerData(currentTeamId),
+      ]);
+
+      setAllResources(resourceData.resources);
+      setFilterOptions(resourceData.filterOptions);
+      setAllWorkItems(workItems);
+      setAssignments(schedulerData.assignments);
+      setNotes(schedulerData.notes);
+      setDayEvents(schedulerData.dayEvents);
+    } catch (error) {
+      console.error("Failed to load scheduler data:", error);
+      toast.error("Failed to load scheduler data.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [teamId, currentUserRole]);
+
+  useEffect(() => {
+    setIsLoading(true);
+    fetchData();
+  }, [fetchData]);
 
   // --- HANDLER FUNCTIONS ---
+  const handleAssignmentClick = (assignment: Assignment) => {
+    setSelectedAssignment(assignment);
+    setIsModalOpen(true);
+  };
+
+  const handleBulkAssign = async (formData: BulkAssignFormData) => {
+    if (!selectedAssignment || !teamId)
+      return toast.error("Required data is missing.");
+    const originalResource = allResources.find(
+      (r) =>
+        r.id === selectedAssignment.resourceId ||
+        r.id === selectedAssignment.workItemId
+    );
+    if (!originalResource)
+      return toast.error("Could not find the original resource.");
+
+    setIsLoading(true);
+    try {
+      await createBulkAssignments(
+        formData,
+        selectedAssignment,
+        originalResource.type,
+        teamId
+      );
+      toast.success("Assignments updated successfully!");
+    } catch (error) {
+      console.error("Bulk assignment failed:", error);
+      toast.error("Failed to update assignments.");
+    } finally {
+      setIsModalOpen(false);
+      await fetchData();
+    }
+  };
+
   const handleFilterChange = (filterKey: keyof ActiveFilters, id: string) => {
     setActiveFilters((prev) => {
       const currentValues = prev[filterKey];
       const newValues = currentValues.includes(id)
-        ? currentValues.filter((val) => val !== id) // Remove if it exists
-        : [...currentValues, id]; // Add if it doesn't exist
+        ? currentValues.filter((val) => val !== id)
+        : [...currentValues, id];
       return { ...prev, [filterKey]: newValues };
     });
   };
@@ -164,7 +201,7 @@ export default function SchedulerPage() {
     setDayEvents((prev) => [...prev, newEvent]);
     try {
       await createDayEvent(newEvent, teamId);
-      router.refresh();
+      await fetchData();
     } catch (error) {
       toast.error("Failed to add event.");
       setDayEvents((prev) => prev.filter((e) => e.id !== tempId));
@@ -206,7 +243,7 @@ export default function SchedulerPage() {
         if (!teamId) throw new Error("Team ID not found");
         const { id, ...noteData } = noteToSave;
         await createNote({ ...noteData, text: newText }, teamId);
-        router.refresh();
+        await fetchData();
       } catch (error) {
         toast.error("Failed to save note.");
         setNotes((prev) => prev.filter((n) => n.id !== noteId));
@@ -302,7 +339,6 @@ export default function SchedulerPage() {
     if (type === "WORK_ITEM") {
       const workItem = item as WorkItem;
       let assignmentType: "project" | "equipment" | "vehicle" | "absence";
-
       if (workItem.type === "project") {
         assignmentType = "project";
       } else if (workItem.type === "equipment") {
@@ -324,48 +360,6 @@ export default function SchedulerPage() {
         assignmentType = "absence";
       } else {
         return;
-      }
-
-      if (viewType === "personnel" || viewType === "all") {
-        if (assignmentType === "equipment" || assignmentType === "vehicle") {
-          if (
-            assignments.some(
-              (a) =>
-                a.workItemId === workItem.id &&
-                a.date === targetDate &&
-                a.shift === targetShift
-            )
-          ) {
-            toast.error(`${workItem.name} is already assigned in this shift.`);
-            return;
-          }
-        }
-      } else {
-        if (
-          assignments.some(
-            (a) =>
-              a.workItemId === targetResourceId &&
-              a.date === targetDate &&
-              a.shift === targetShift
-          )
-        ) {
-          toast.error(`This resource already has an assignment in this shift.`);
-          return;
-        }
-        if (
-          assignments.some(
-            (a) =>
-              a.resourceId === workItem.id &&
-              a.date === targetDate &&
-              a.shift === targetShift &&
-              a.assignmentType === assignmentType
-          )
-        ) {
-          toast.error(
-            `${workItem.name} is already assigned to other ${assignmentType} in this shift.`
-          );
-          return;
-        }
       }
 
       let finalWorkItemId = workItem.id;
@@ -393,15 +387,12 @@ export default function SchedulerPage() {
       setAssignments((prev) => [...prev, newAssignment]);
       try {
         if (!teamId) throw new Error("Team ID not found");
-
         const targetResource = allResources.find(
           (r) => r.id === targetResourceId
         );
         if (!targetResource) throw new Error("Target resource not found");
-
-        // Corrected: Added the third argument 'targetResource.type'
         await createAssignment(newAssignment, teamId, targetResource.type);
-        router.refresh();
+        await fetchData();
       } catch (error) {
         console.error("Failed to save assignment:", error);
         toast.error("Failed to save assignment.");
@@ -410,7 +401,51 @@ export default function SchedulerPage() {
     }
   };
 
-  // --- MEMOIZED CALCULATIONS & DERIVED STATE (Must be before return statement) ---
+  // --- MEMOIZED CALCULATIONS & DERIVED STATE ---
+  const filteredResources = useMemo(() => {
+    let resources =
+      viewType === "all"
+        ? allResources
+        : allResources.filter((r) => r.type === viewType);
+    if (viewType === "personnel") {
+      const { jobRoleIds, subTeamIds, lineManagerIds } = activeFilters;
+      if (jobRoleIds.length > 0)
+        resources = resources.filter(
+          (r) => r.job_role_id && jobRoleIds.includes(r.job_role_id)
+        );
+      if (subTeamIds.length > 0)
+        resources = resources.filter(
+          (r) => r.sub_team_id && subTeamIds.includes(r.sub_team_id)
+        );
+      if (lineManagerIds.length > 0)
+        resources = resources.filter(
+          (r) => r.line_manager_id && lineManagerIds.includes(r.line_manager_id)
+        );
+    }
+    if (viewType === "equipment") {
+      const { assetCategoryIds } = activeFilters;
+      if (assetCategoryIds.length > 0)
+        resources = resources.filter(
+          (r) => r.category_id && assetCategoryIds.includes(r.category_id)
+        );
+    }
+    return resources;
+  }, [viewType, allResources, activeFilters]);
+
+  const activeFilterCount = useMemo(() => {
+    if (viewType === "personnel") {
+      return (
+        activeFilters.jobRoleIds.length +
+        activeFilters.subTeamIds.length +
+        activeFilters.lineManagerIds.length
+      );
+    }
+    if (viewType === "equipment") {
+      return activeFilters.assetCategoryIds.length;
+    }
+    return 0;
+  }, [viewType, activeFilters]);
+
   const visibleDates = useMemo(() => {
     const start = new Date(currentDate);
     const dates: Date[] = [];
@@ -457,7 +492,6 @@ export default function SchedulerPage() {
     switch (viewType) {
       case "equipment":
       case "vehicles":
-        // Get personnel to drag onto equipment/vehicles
         const personnelAsWorkItems = allResources
           .filter((r) => r.type === "personnel")
           .map(
@@ -465,13 +499,11 @@ export default function SchedulerPage() {
               id: r.id,
               name: r.name,
               type: "personnel",
-              color: "bg-blue-500",
+              color: r.color,
             })
           );
-        // Get only the absences relevant to this resource type
         const relevantAbsences = getAbsencesForView(viewType);
         return [...personnelAsWorkItems, ...relevantAbsences];
-
       case "personnel":
         const equipmentAsWorkItems = allResources
           .filter((r) => r.type === "equipment")
@@ -480,7 +512,7 @@ export default function SchedulerPage() {
               id: r.id,
               name: r.name,
               type: "equipment",
-              color: "bg-purple-500",
+              color: r.color,
             })
           );
         const vehiclesAsWorkItems = allResources
@@ -490,22 +522,19 @@ export default function SchedulerPage() {
               id: r.id,
               name: r.name,
               type: "vehicle",
-              color: "bg-green-500",
+              color: r.color,
             })
           );
         const projectItems = allWorkItems.filter(
           (item) => item.type === "project"
         );
-        // Get only absences for personnel
         const personnelAbsences = getAbsencesForView("personnel");
-
         return [
           ...equipmentAsWorkItems,
           ...vehiclesAsWorkItems,
           ...projectItems,
           ...personnelAbsences,
         ];
-
       default:
         return allWorkItems.filter(
           (item) => item.type === "project" || item.type === "absence"
@@ -526,57 +555,6 @@ export default function SchedulerPage() {
       {} as Record<string, WorkItem[]>
     );
   }, [draggableItems]);
-
-  const filteredResources = useMemo(() => {
-    let resources =
-      viewType === "all"
-        ? allResources
-        : allResources.filter((resource) => resource.type === viewType);
-
-    if (viewType === "personnel") {
-      const { jobRoleIds, subTeamIds, lineManagerIds } = activeFilters;
-      if (jobRoleIds.length > 0) {
-        resources = resources.filter(
-          (r) => r.job_role_id && jobRoleIds.includes(r.job_role_id)
-        );
-      }
-      if (subTeamIds.length > 0) {
-        resources = resources.filter(
-          (r) => r.sub_team_id && subTeamIds.includes(r.sub_team_id)
-        );
-      }
-      if (lineManagerIds.length > 0) {
-        resources = resources.filter(
-          (r) => r.line_manager_id && lineManagerIds.includes(r.line_manager_id)
-        );
-      }
-    }
-
-    if (viewType === "equipment") {
-      const { assetCategoryIds } = activeFilters;
-      if (assetCategoryIds.length > 0) {
-        resources = resources.filter(
-          (r) => r.category_id && assetCategoryIds.includes(r.category_id)
-        );
-      }
-    }
-
-    return resources;
-  }, [viewType, allResources, activeFilters]);
-
-  const activeFilterCount = useMemo(() => {
-    if (viewType === "personnel") {
-      return (
-        activeFilters.jobRoleIds.length +
-        activeFilters.subTeamIds.length +
-        activeFilters.lineManagerIds.length
-      );
-    }
-    if (viewType === "equipment") {
-      return activeFilters.assetCategoryIds.length;
-    }
-    return 0;
-  }, [viewType, activeFilters]);
 
   const isReadOnly = currentUserRole !== "team_admin";
 
@@ -627,7 +605,6 @@ export default function SchedulerPage() {
             </div>
           </div>
 
-          {/* Controls & Toolbox */}
           <div className="mb-4 p-4 bg-white rounded-lg shadow border">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
               <div className="lg:col-span-2">
@@ -650,7 +627,6 @@ export default function SchedulerPage() {
                     ))}
                 </div>
               </div>
-
               <div>
                 <label
                   htmlFor="viewType"
@@ -673,7 +649,6 @@ export default function SchedulerPage() {
                   </SelectContent>
                 </Select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   Filters
@@ -699,7 +674,6 @@ export default function SchedulerPage() {
                   <PopoverContent className="w-64 p-4">
                     {viewType === "personnel" && (
                       <div className="space-y-4">
-                        {/* Job Roles Filter */}
                         <div className="space-y-2">
                           <h4 className="font-medium">Job Role</h4>
                           <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
@@ -727,7 +701,6 @@ export default function SchedulerPage() {
                             ))}
                           </div>
                         </div>
-                        {/* Sub-Teams Filter */}
                         <div className="space-y-2">
                           <h4 className="font-medium">Sub-Team</h4>
                           <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
@@ -755,7 +728,6 @@ export default function SchedulerPage() {
                             ))}
                           </div>
                         </div>
-                        {/* Line Managers Filter */}
                         <div className="space-y-2">
                           <h4 className="font-medium">Line Manager</h4>
                           <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
@@ -820,8 +792,6 @@ export default function SchedulerPage() {
                   </PopoverContent>
                 </Popover>
               </div>
-              {/* --- END: DYNAMIC FILTER COMPONENT --- */}
-
               <div>
                 <label
                   htmlFor="shiftView"
@@ -864,12 +834,7 @@ export default function SchedulerPage() {
                     id: r.id,
                     name: r.name,
                     type: r.type as any,
-                    color:
-                      r.type === "personnel"
-                        ? "bg-blue-500"
-                        : r.type === "equipment"
-                          ? "bg-purple-500"
-                          : "bg-green-500",
+                    color: r.color,
                   })),
                 ]}
                 shiftView={shiftView}
@@ -882,11 +847,28 @@ export default function SchedulerPage() {
                 onAddDayEvent={handleAddDayEvent}
                 onDeleteDayEvent={handleDeleteDayEvent}
                 isReadOnly={isReadOnly}
+                onAssignmentClick={handleAssignmentClick}
               />
             )}
           </div>
         </div>
       </div>
+
+      <BulkAssignModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        assignment={selectedAssignment}
+        workItems={[
+          ...allWorkItems,
+          ...allResources.map((r) => ({
+            id: r.id,
+            name: r.name,
+            type: r.type as any,
+            color: r.color,
+          })),
+        ]}
+        onSave={handleBulkAssign}
+      />
     </DndProvider>
   );
 }

@@ -23,12 +23,9 @@ const getWeekOfYear = (date: Date): number => {
   const d = new Date(
     Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
   );
-  // Set to nearest Thursday: current date + 4 - current day number
-  // Makes Monday=1... Sunday=7
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  // Calculate full weeks to nearest Thursday
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 };
 
@@ -62,6 +59,7 @@ interface SchedulerGridProps {
   onDeleteNote: (noteId: string) => void;
   onAddDayEvent: (date: string, text: string, type: DayEvent["type"]) => void;
   onDeleteDayEvent: (eventId: string) => void;
+  onAssignmentClick: (assignment: Assignment) => void; // <-- Add prop
 }
 
 interface DroppableCellProps {
@@ -108,7 +106,7 @@ const DroppableCell = ({
       {!isReadOnly && (
         <button
           onClick={onAddNote}
-          className="absolute top-0 right-0 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute bottom-1 right-1 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
         >
           <Plus className="h-3 w-3 text-gray-400" />
         </button>
@@ -135,6 +133,7 @@ export function SchedulerGrid({
   onDeleteNote,
   onAddDayEvent,
   onDeleteDayEvent,
+  onAssignmentClick,
 }: SchedulerGridProps) {
   const gridTemplateColumns = `200px repeat(${dates.length}, minmax(120px, 1fr))`;
   const rowCount =
@@ -146,26 +145,34 @@ export function SchedulerGrid({
     dateString: string,
     resource: Resource
   ) => {
+    // Define the desired display order for assignment types
+    const sortOrder: { [key: string]: number } = {
+      project: 1,
+      absence: 2,
+      equipment: 3,
+      vehicle: 4,
+    };
+
     return (
       <>
         {assignments
           .filter((a) => {
             if (a.shift !== shift || a.date !== dateString) return false;
-            // An assignment is relevant to this cell if the cell's resource (the row)
-            // is involved in the assignment as either the primary resource or the work item.
             return a.resourceId === resource.id || a.workItemId === resource.id;
+          })
+          .sort((a, b) => {
+            // <-- ADD THIS SORTING LOGIC
+            const priorityA = sortOrder[a.assignmentType] || 99;
+            const priorityB = sortOrder[b.assignmentType] || 99;
+            return priorityA - priorityB;
           })
           .map((assignment) => {
             let itemToDisplay;
-
-            // If the row's resource is the assignment's primary resource, display the work item.
             if (assignment.resourceId === resource.id) {
               itemToDisplay = workItems.find(
                 (item) => item.id === assignment.workItemId
               );
-            }
-            // If the row's resource is the assignment's work item, display the primary resource.
-            else if (assignment.workItemId === resource.id) {
+            } else if (assignment.workItemId === resource.id) {
               itemToDisplay = workItems.find(
                 (item) => item.id === assignment.resourceId
               );
@@ -178,6 +185,7 @@ export function SchedulerGrid({
                 itemToDisplay={itemToDisplay}
                 onRemoveAssignment={onRemoveAssignment}
                 isReadOnly={isReadOnly}
+                onAssignmentClick={onAssignmentClick}
               />
             ) : null;
           })}
@@ -267,7 +275,7 @@ export function SchedulerGrid({
           return (
             <React.Fragment key={resource.id}>
               <div
-                className="sticky left-0 z-20 bg-white border-r border-b border-gray-200 p-2 font-medium text-sm flex items-center"
+                className="sticky left-0 z-20 bg-white border-r border-b border-gray-200 p-2 text-sm flex items-center"
                 style={{ gridRow: `${gridRowStart} / span ${rowSpan}` }}
               >
                 {resource.type === "personnel" && (
@@ -279,7 +287,16 @@ export function SchedulerGrid({
                 {resource.type === "vehicles" && (
                   <Truck className="w-4 h-4 mr-2 text-gray-500" />
                 )}
-                {resource.name}
+
+                <div>
+                  <div className="font-medium">{resource.name}</div>
+                  {/* This line is changed to use job_role_name */}
+                  {resource.type === "personnel" && resource.job_role_name && (
+                    <div className="text-xs text-gray-500 font-normal">
+                      {resource.job_role_name}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {shiftView !== "night" &&

@@ -15,6 +15,7 @@ export type Project = {
     site_lead_id: string | null;
     site_lead_external_name: string | null;
     job_description: string | null;
+    color?: string | null;
 };
 export type ProjectListItem = { id: string; name: string; reference: string | null; last_edited_at: string; document_status: string | null;};
 export type Task = { id: string; project_id: string; team_id: string; title: string; description: string | null; status: 'Not Started' | 'In Progress' | 'Completed'; progress: number; sort_order: number; created_at: string; };
@@ -141,11 +142,13 @@ export interface Resource {
   id: string;
   name: string;
   type: ResourceType;
+  color: string;
   avatar?: string;
   job_role_id?: string | null;
   sub_team_id?: string | null;
   line_manager_id?: string | null;
   category_id?: string | null;
+  job_role_name?: string | null;
 }
 
 

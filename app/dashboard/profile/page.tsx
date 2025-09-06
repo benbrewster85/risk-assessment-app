@@ -34,9 +34,9 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [jobTitle, setJobTitle] = useState("");
   const [teamId, setTeamId] = useState<string | null>(null);
   const [isFetchingUrl, setIsFetchingUrl] = useState<string | null>(null);
+  const [jobRoleName, setJobRoleName] = useState("");
 
   // States for the competencies feature
   const [teamCompetencies, setTeamCompetencies] = useState<Competency[]>([]);
@@ -53,7 +53,7 @@ export default function ProfilePage() {
     async (user: User) => {
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
-        .select("first_name, last_name, job_title, team_id")
+        .select("first_name, last_name, team_id, job_role:job_roles(name)")
         .eq("id", user.id)
         .single();
 
@@ -64,13 +64,15 @@ export default function ProfilePage() {
       }
 
       if (profileData) {
+        console.log("Profile Data Received:", profileData); // ADD THIS LINE to debug
         setFirstName(profileData.first_name || "");
         setLastName(profileData.last_name || "");
-        setJobTitle(profileData.job_title || "");
         setTeamId(profileData.team_id || null);
 
+        // FIXED: Correctly access the name from the array returned by the join
+        setJobRoleName((profileData.job_role as any)?.name || "Not Assigned");
+
         if (profileData.team_id) {
-          // FIXED: Corrected how Promise.all results are handled
           const [teamListResult, myListResult] = await Promise.all([
             supabase
               .from("competencies")
@@ -117,7 +119,6 @@ export default function ProfilePage() {
       .update({
         first_name: firstName,
         last_name: lastName,
-        job_title: jobTitle,
       })
       .eq("id", user.id);
 
@@ -312,16 +313,15 @@ export default function ProfilePage() {
               </div>
             </div>
             <div>
-              <label htmlFor="jobTitle" className="block text-sm font-medium">
-                Job Title
+              <label className="block text-sm font-medium text-gray-700">
+                Job Role
               </label>
-              <input
-                id="jobTitle"
-                type="text"
-                value={jobTitle}
-                onChange={(e) => setJobTitle(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-              />
+              <div className="mt-1 block w-full p-2 rounded-md border-gray-200 bg-gray-50">
+                <p className="text-sm text-gray-900">{jobRoleName}</p>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Your job role is managed by your team administrator.
+              </p>
             </div>
             <div className="pt-4">
               <button
