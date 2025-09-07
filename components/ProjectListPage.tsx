@@ -2,11 +2,20 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { ProjectListItem, TeamMember, Project } from "@/lib/types";
-import { Plus, Edit2, Trash2, ArrowDown, ArrowUp } from "react-feather";
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  ArrowDown,
+  ArrowUp,
+  List,
+  Map as MapIcon,
+} from "react-feather";
 import AddProjectModal from "./AddProjectModal";
 import ConfirmModal from "./ConfirmModal";
 
@@ -26,8 +35,15 @@ export default function ProjectListPage({
   const supabase = createClient();
   const router = useRouter();
   const [projects, setProjects] = useState(initialProjects || []);
+  const ProjectMap = dynamic(() => import("./ProjectMap"), {
+    ssr: false, // <-- This is the crucial part
+    loading: () => (
+      <div className="w-full h-[70vh] rounded-lg bg-gray-200 animate-pulse" />
+    ),
+  });
 
   // State for the new modals
+  const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [deletingProject, setDeletingProject] =
@@ -140,15 +156,33 @@ export default function ProjectListPage({
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-3xl font-bold">All Projects</h1>
-            {currentUserRole === "team_admin" && (
+            <div className="flex items-center space-x-2">
+              {/* --- NEW: View Mode Toggle Buttons --- */}
               <button
-                onClick={openCreateModal}
-                className="bg-blue-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-blue-700 flex items-center transition-colors"
+                onClick={() => setViewMode("list")}
+                className={`p-2 rounded-md ${viewMode === "list" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-600"}`}
+                aria-label="List View"
               >
-                <Plus className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">New Project</span>
+                <List size={18} />
               </button>
-            )}
+              <button
+                onClick={() => setViewMode("map")}
+                className={`p-2 rounded-md ${viewMode === "map" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-600"}`}
+                aria-label="Map View"
+              >
+                <MapIcon size={18} />
+              </button>
+
+              {currentUserRole === "team_admin" && (
+                <button
+                  onClick={openCreateModal}
+                  className="bg-blue-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-blue-700 flex items-center transition-colors"
+                >
+                  <Plus className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">New Project</span>
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="mb-4">
@@ -161,97 +195,105 @@ export default function ProjectListPage({
             />
           </div>
 
-          <div className="bg-white rounded-lg shadow overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSort("name")}
-                  >
-                    Project Name{" "}
-                    {sortBy === "name" &&
-                      (sortDirection === "asc" ? (
-                        <ArrowUp className="inline h-4 w-4" />
-                      ) : (
-                        <ArrowDown className="inline h-4 w-4" />
-                      ))}
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSort("last_edited_at")}
-                  >
-                    Last Edited{" "}
-                    {sortBy === "last_edited_at" &&
-                      (sortDirection === "asc" ? (
-                        <ArrowUp className="inline h-4 w-4" />
-                      ) : (
-                        <ArrowDown className="inline h-4 w-4" />
-                      ))}
-                  </th>
-                  <th className="relative px-6 py-3">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {sortedAndFilteredProjects.length > 0 ? (
-                  sortedAndFilteredProjects.map((project) => (
-                    <tr key={project.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Link
-                          href={`/dashboard/project/${project.id}`}
-                          className="text-blue-700 hover:underline"
-                        >
-                          <div className="text-sm font-semibold">
-                            {project.name}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {project.reference}
-                          </div>
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {project.document_status || "N/A"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(project.last_edited_at).toLocaleString(
-                          "en-GB"
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
-                        {currentUserRole === "team_admin" && (
-                          <>
-                            <button
-                              onClick={() => openEditModal(project.id)}
-                              className="text-indigo-600 hover:text-indigo-900"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => setDeletingProject(project)}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              Delete
-                            </button>
-                          </>
-                        )}
+          {/* --- NEW: Conditional Rendering for List or Map --- */}
+          {viewMode === "list" ? (
+            <div className="bg-white rounded-lg shadow overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                      onClick={() => handleSort("name")}
+                    >
+                      Project Name{" "}
+                      {sortBy === "name" &&
+                        (sortDirection === "asc" ? (
+                          <ArrowUp className="inline h-4 w-4" />
+                        ) : (
+                          <ArrowDown className="inline h-4 w-4" />
+                        ))}
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                      onClick={() => handleSort("last_edited_at")}
+                    >
+                      Last Edited{" "}
+                      {sortBy === "last_edited_at" &&
+                        (sortDirection === "asc" ? (
+                          <ArrowUp className="inline h-4 w-4" />
+                        ) : (
+                          <ArrowDown className="inline h-4 w-4" />
+                        ))}
+                    </th>
+                    <th className="relative px-6 py-3">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {sortedAndFilteredProjects.length > 0 ? (
+                    sortedAndFilteredProjects.map((project) => (
+                      <tr key={project.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Link
+                            href={`/dashboard/project/${project.id}`}
+                            className="text-blue-700 hover:underline"
+                          >
+                            <div className="text-sm font-semibold">
+                              {project.name}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {project.reference}
+                            </div>
+                          </Link>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          {project.document_status || "N/A"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(project.last_edited_at).toLocaleString(
+                            "en-GB"
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+                          {currentUserRole === "team_admin" && (
+                            <>
+                              <button
+                                onClick={() => openEditModal(project.id)}
+                                className="text-indigo-600 hover:text-indigo-900"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => setDeletingProject(project)}
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                Delete
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="text-center text-gray-500 py-8"
+                      >
+                        No projects found.
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={4} className="text-center text-gray-500 py-8">
-                      No projects found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <ProjectMap projects={sortedAndFilteredProjects} />
+          )}
         </div>
       </div>
     </>

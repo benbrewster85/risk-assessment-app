@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-hot-toast";
 import { Project, TeamMember } from "@/lib/types";
 import ColorPicker from "./ColorPicker";
+import LocationSearchInput from "./LocationSearchInput"; // <-- Make sure this is imported
 
 type ProjectDetailsTabProps = {
   project: Project;
@@ -34,6 +35,8 @@ export default function ProjectDetailsTab({
   const [name, setName] = useState(project.name);
   const [reference, setReference] = useState(project.reference || "");
   const [address, setAddress] = useState(project.location_address || "");
+  const [latitude, setLatitude] = useState(project.latitude || null);
+  const [longitude, setLongitude] = useState(project.longitude || null);
   const [costCode, setCostCode] = useState(project.cost_code || "");
   const [clientContact, setClientContact] = useState(
     project.client_contact || ""
@@ -60,8 +63,21 @@ export default function ProjectDetailsTab({
     setPmId(project.project_manager_id || "");
     setSlId(project.site_lead_id || "");
     setJobDescription(project.job_description || "");
+    setAddress(project.location_address || "");
+    setLatitude(project.latitude || null);
+    setLongitude(project.longitude || null);
     setColor(project.color || "bg-slate-200 text-slate-800"); // <-- 2. Sync color state
   }, [project]);
+
+  const handleLocationSelect = (location: {
+    address: string;
+    longitude: number;
+    latitude: number;
+  }) => {
+    setAddress(location.address);
+    setLatitude(location.latitude);
+    setLongitude(location.longitude);
+  };
 
   const handleSaveChanges = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +91,8 @@ export default function ProjectDetailsTab({
       project_manager_id: pmId || null,
       site_lead_id: slId || null,
       location_address: address,
+      latitude: latitude,
+      longitude: longitude,
       job_description: jobDescription,
       color: color, // <-- 3. Add color to the save payload
       last_edited_at: new Date().toISOString(),
@@ -244,14 +262,14 @@ export default function ProjectDetailsTab({
           </div>
 
           {/* Site Address Section */}
-          <div className="px-4">
-            <label className="block text-sm font-medium">Site Address</label>
-            <textarea
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              readOnly={!isEditing}
-              rows={3}
-              className={`w-full ${!isEditing ? "bg-white" : ""}`}
+          <div className="md:col-span-2 lg:col-span-3">
+            <label className="block text-sm font-medium mb-1">
+              Site Address
+            </label>
+            <LocationSearchInput
+              initialValue={address}
+              onLocationSelect={handleLocationSelect}
+              disabled={!isEditing}
             />
           </div>
         </div>

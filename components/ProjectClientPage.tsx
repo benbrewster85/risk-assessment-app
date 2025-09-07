@@ -14,13 +14,18 @@ import {
   Task,
   TeamMember,
 } from "@/lib/types";
+import { toast } from "react-hot-toast";
+
+// Import all tab components
 import DynamicRiskLog from "./DynamicRiskLog";
 import ProjectDetailsTab from "./ProjectDetailsTab";
-import MethodStatementTab from "./MethodStatementTab";
+import ProjectEstimateTab from "./ProjectEstimateTab";
 import ProjectBriefTab from "./ProjectBriefTab";
+import MethodStatementTab from "./MethodStatementTab";
+import ProjectRisksTab from "./ProjectRisksTab"; // <-- NEW
 import ViewReportModal from "./ViewReportModal";
-import { toast } from "react-hot-toast";
 import { Plus, AlertTriangle } from "react-feather";
+import ShiftReportsTab from "./ShiftReportsTab";
 
 type ProjectClientPageProps = {
   initialProject: Project;
@@ -45,6 +50,8 @@ export default function ProjectClientPage({
 }: ProjectClientPageProps) {
   const supabase = createClient();
   const router = useRouter();
+
+  // All your existing state is preserved
   const [project, setProject] = useState(initialProject);
   const [riskAssessments, setRiskAssessments] = useState(
     initialRiskAssessments
@@ -77,6 +84,11 @@ export default function ProjectClientPage({
   const [viewingReportId, setViewingReportId] = useState<string | null>(null);
 
   const isAdmin = currentUserRole === "team_admin";
+
+  // All your existing handler functions are preserved
+  const handleProjectUpdate = (updatedProject: Project) =>
+    setProject(updatedProject);
+  const handleTasksUpdate = (newTasks: Task[]) => setTasks(newTasks);
 
   useEffect(() => {
     setProject(initialProject);
@@ -148,13 +160,11 @@ export default function ProjectClientPage({
       toast.error(`Failed to save RA: ${error.message}`);
     } else if (data) {
       toast.success(`RA ${editingRa ? "updated" : "created"} successfully!`);
-      if (editingRa) {
-        setRiskAssessments(
-          riskAssessments.map((ra) => (ra.id === data.id ? data : ra))
-        );
-      } else {
-        setRiskAssessments([data, ...riskAssessments]);
-      }
+      setRiskAssessments(
+        editingRa
+          ? riskAssessments.map((ra) => (ra.id === data.id ? data : ra))
+          : [data, ...riskAssessments]
+      );
       setIsRaModalOpen(false);
     }
   };
@@ -213,6 +223,7 @@ export default function ProjectClientPage({
           .insert(dynamicRiskData)
           .select("*, logged_by:profiles(first_name, last_name)")
           .single();
+
     if (error) {
       toast.error(`Error saving dynamic risk: ${error.message}`);
     } else if (resultRisk) {
@@ -225,15 +236,13 @@ export default function ProjectClientPage({
           ? resultRisk.logged_by[0]
           : resultRisk.logged_by,
       };
-      if (editingDynamicRisk) {
-        setDynamicRisks(
-          dynamicRisks.map((r) =>
-            r.id === transformedRisk.id ? transformedRisk : r
-          )
-        );
-      } else {
-        setDynamicRisks([transformedRisk, ...dynamicRisks]);
-      }
+      setDynamicRisks(
+        editingDynamicRisk
+          ? dynamicRisks.map((r) =>
+              r.id === transformedRisk.id ? transformedRisk : r
+            )
+          : [transformedRisk, ...dynamicRisks]
+      );
       setIsDynamicRiskModalOpen(false);
     }
     setIsSubmitting(false);
@@ -256,13 +265,101 @@ export default function ProjectClientPage({
     setDeletingDynamicRiskId(null);
   };
 
-  if (!project) return <p className="p-8">Project not found.</p>;
-
   const tabClass = (tabName: string) =>
     `whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === tabName ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}`;
 
+  // ### The New Tabs Array ###
+  // All your tab content is now defined here.
+  const tabs = [
+    {
+      key: "details",
+      name: "Project Details",
+      component: (
+        <ProjectDetailsTab
+          project={project}
+          onUpdate={setProject}
+          isCurrentUserAdmin={isAdmin}
+          teamMembers={teamMembers}
+        />
+      ),
+    },
+    {
+      key: "estimate",
+      name: "Estimate",
+      component: (
+        <ProjectEstimateTab
+          project={project}
+          tasks={tasks}
+          isCurrentUserAdmin={isAdmin}
+          onTasksUpdate={setTasks}
+        />
+      ),
+    },
+    {
+      key: "brief",
+      name: "Brief & Tasks",
+      component: (
+        <ProjectBriefTab
+          project={project}
+          initialTasks={tasks}
+          isCurrentUserAdmin={isAdmin}
+          onBriefUpdate={setProject}
+        />
+      ),
+    },
+    {
+      key: "method_statement",
+      name: "Method Statement",
+      component: (
+        <MethodStatementTab
+          project={project}
+          onUpdate={setProject}
+          isCurrentUserAdmin={isAdmin}
+        />
+      ),
+    },
+    // --- NEW COMBINED TAB ---
+    {
+      key: "risks",
+      name: "Risks",
+      component: (
+        <ProjectRisksTab
+          riskAssessments={riskAssessments}
+          dynamicRisks={dynamicRisks}
+          isCurrentUserAdmin={isAdmin}
+          onAddRa={openCreateRaModal}
+          onEditRa={openEditRaModal}
+          onDeleteRa={(ra) => setDeletingRa(ra)}
+          onLogDynamicRisk={() => openLogDynamicRiskModal(null)}
+          onEditDynamicRisk={openLogDynamicRiskModal}
+          onDeleteDynamicRisk={(id) => setDeletingDynamicRiskId(id)}
+        />
+      ),
+    },
+
+    {
+      key: "shift_reports",
+      name: "Shift Reports",
+      component: (
+        <ShiftReportsTab
+          shiftReports={shiftReports}
+          tasks={tasks}
+          onViewReport={(id) => setViewingReportId(id)}
+        />
+      ),
+    },
+    // --- OLD TABS REMOVED ---
+  ];
+
+  const activeTabComponent = tabs.find(
+    (tab) => tab.key === activeTab
+  )?.component;
+
+  if (!project) return <p className="p-8">Project not found.</p>;
+
   return (
     <>
+      {/* All your modals are preserved */}
       <ViewReportModal
         reportId={viewingReportId}
         onClose={() => setViewingReportId(null)}
@@ -424,6 +521,7 @@ export default function ProjectClientPage({
 
       <div className="p-4 sm:p-8">
         <div className="max-w-7xl mx-auto">
+          {/* Header section is preserved */}
           <div className="mb-6 text-sm">
             <Link
               href="/dashboard/projects"
@@ -439,226 +537,30 @@ export default function ProjectClientPage({
               <h1 className="text-3xl font-bold">{project.name}</h1>
               <p className="text-gray-600">Ref: {project.reference || "N/A"}</p>
             </div>
-            <div className="flex space-x-2 flex-shrink-0">
-              <button
-                onClick={() => openLogDynamicRiskModal(null)}
-                className="bg-orange-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-orange-700 flex items-center"
-              >
-                <AlertTriangle className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Log Dynamic Risk</span>
-              </button>
-              {isAdmin && (
-                <button
-                  onClick={openCreateRaModal}
-                  className="bg-green-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-green-700 flex items-center"
-                >
-                  <Plus className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">New RA</span>
-                </button>
-              )}
-            </div>
+            {/* --- BUTTONS REMOVED FROM HERE --- */}
           </div>
 
+          {/* Tab navigation is now mapped from the array */}
           <div className="border-b border-gray-200">
             <div className="overflow-x-auto no-scrollbar">
               <nav
                 className="-mb-px flex space-x-8 flex-shrink-0"
                 aria-label="Tabs"
               >
-                <button
-                  onClick={() => setActiveTab("details")}
-                  className={tabClass("details")}
-                >
-                  Project Details
-                </button>
-                <button
-                  onClick={() => setActiveTab("brief")}
-                  className={tabClass("brief")}
-                >
-                  Brief & Tasks
-                </button>
-                <button
-                  onClick={() => setActiveTab("method_statement")}
-                  className={tabClass("method_statement")}
-                >
-                  Method Statement
-                </button>
-                <button
-                  onClick={() => setActiveTab("risk_assessments")}
-                  className={tabClass("risk_assessments")}
-                >
-                  Risk Assessments
-                </button>
-                <button
-                  onClick={() => setActiveTab("shift_reports")}
-                  className={tabClass("shift_reports")}
-                >
-                  Shift Reports
-                </button>
-                <button
-                  onClick={() => setActiveTab("dynamic_risks")}
-                  className={tabClass("dynamic_risks")}
-                >
-                  Dynamic Risk Log
-                </button>
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    className={tabClass(tab.key)}
+                  >
+                    {tab.name}
+                  </button>
+                ))}
               </nav>
             </div>
           </div>
 
-          <div className="mt-8">
-            {activeTab === "details" && (
-              <ProjectDetailsTab
-                project={project}
-                onUpdate={(updatedProject) => setProject(updatedProject)}
-                isCurrentUserAdmin={isAdmin}
-                teamMembers={teamMembers}
-              />
-            )}
-            {activeTab === "brief" && (
-              <ProjectBriefTab
-                project={project}
-                initialTasks={tasks}
-                isCurrentUserAdmin={isAdmin}
-                onBriefUpdate={(updatedProject) => setProject(updatedProject)}
-              />
-            )}
-            {activeTab === "method_statement" && (
-              <MethodStatementTab
-                project={project}
-                onUpdate={(updatedProject) => setProject(updatedProject)}
-                isCurrentUserAdmin={isAdmin}
-              />
-            )}
-            {activeTab === "risk_assessments" && (
-              <div className="bg-white p-6 rounded-lg shadow">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-2xl font-bold">Risk Assessments</h2>
-                  {isAdmin && (
-                    <button
-                      onClick={openCreateRaModal}
-                      className="bg-green-600 text-white font-bold py-2 px-3 text-sm rounded-lg hover:bg-green-700 flex items-center"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add RA
-                    </button>
-                  )}
-                </div>
-                {riskAssessments.length > 0 ? (
-                  <div className="space-y-4">
-                    {riskAssessments.map((ra) => (
-                      <div
-                        key={ra.id}
-                        className="border p-4 rounded-md hover:bg-gray-50 flex justify-between items-center"
-                      >
-                        <div
-                          onClick={() => router.push(`/dashboard/ra/${ra.id}`)}
-                          className="flex-grow cursor-pointer"
-                        >
-                          <h3 className="font-semibold text-lg text-blue-700">
-                            {ra.name}
-                          </h3>
-                          <p className="text-sm text-gray-500 line-clamp-2">
-                            {ra.description}
-                          </p>
-                        </div>
-                        <div className="flex items-center flex-shrink-0 ml-4">
-                          <p className="text-xs text-gray-400 mr-4">
-                            Created:{" "}
-                            {new Date(ra.created_at).toLocaleDateString(
-                              "en-GB"
-                            )}
-                          </p>
-                          {isAdmin && (
-                            <div className="flex space-x-3">
-                              <button
-                                onClick={() => openEditRaModal(ra)}
-                                className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => setDeletingRa(ra)}
-                                className="text-sm font-medium text-red-600 hover:text-red-800"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <h3 className="text-xl font-medium">
-                      No risk assessments yet.
-                    </h3>
-                    {isAdmin && (
-                      <p className="text-gray-500 mt-2">
-                        Get started by creating your first RA for this project.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-            {activeTab === "shift_reports" && (
-              <div className="bg-white p-6 rounded-lg shadow overflow-x-auto">
-                <h2 className="text-2xl font-bold mb-4">Shift Reports</h2>
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase">
-                        Type
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase">
-                        Date
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase">
-                        Created By
-                      </th>
-                      <th className="relative px-6 py-3">
-                        <span className="sr-only">View</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {shiftReports.map((report) => (
-                      <tr key={report.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
-                          {report.log_type}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {new Date(report.start_time).toLocaleDateString(
-                            "en-GB"
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {`${report.created_by?.first_name || ""} ${report.created_by?.last_name || ""}`.trim()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() => setViewingReportId(report.id)}
-                            className="text-indigo-600 hover:text-indigo-900"
-                          >
-                            View Details
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {activeTab === "dynamic_risks" && (
-              <DynamicRiskLog
-                risks={dynamicRisks}
-                isCurrentUserAdmin={isAdmin}
-                onEdit={openLogDynamicRiskModal}
-                onDelete={(riskId) => setDeletingDynamicRiskId(riskId)}
-              />
-            )}
-          </div>
+          <div className="mt-8">{activeTabComponent}</div>
         </div>
       </div>
     </>
