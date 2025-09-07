@@ -80,6 +80,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 
+  console.log("Server-side mapboxToken:", mapboxToken);
+
   return (
     <ProjectClientPage
       initialProject={project as Project}
