@@ -19,6 +19,13 @@ import {
 import AddProjectModal from "./AddProjectModal";
 import ConfirmModal from "./ConfirmModal";
 
+const ProjectMap = dynamic(() => import("./ProjectMap"), {
+  ssr: false, // <-- This is the crucial part
+  loading: () => (
+    <div className="w-full h-[70vh] rounded-lg bg-gray-200 animate-pulse" />
+  ),
+});
+
 type ProjectListPageProps = {
   initialProjects: ProjectListItem[];
   teamMembers: TeamMember[];
@@ -35,12 +42,6 @@ export default function ProjectListPage({
   const supabase = createClient();
   const router = useRouter();
   const [projects, setProjects] = useState(initialProjects || []);
-  const ProjectMap = dynamic(() => import("./ProjectMap"), {
-    ssr: false, // <-- This is the crucial part
-    loading: () => (
-      <div className="w-full h-[70vh] rounded-lg bg-gray-200 animate-pulse" />
-    ),
-  });
 
   // State for the new modals
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
