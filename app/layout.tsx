@@ -1,5 +1,6 @@
 import { Inter } from "next/font/google";
 import { Toaster } from "react-hot-toast";
+import "leaflet/dist/leaflet.css";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
