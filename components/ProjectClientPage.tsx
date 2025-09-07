@@ -36,6 +36,7 @@ type ProjectClientPageProps = {
   teamMembers: TeamMember[];
   currentUserId: string;
   currentUserRole: string;
+  mapboxToken?: string;
 };
 
 export default function ProjectClientPage({
