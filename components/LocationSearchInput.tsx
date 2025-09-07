@@ -1,10 +1,11 @@
-"use a client";
+"use client";
 
 import { useEffect, useRef } from "react";
 import MapboxGeocoder from "@mapbox/mapbox-gl-geocoder";
 import "@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css";
 
 type LocationSearchInputProps = {
+  accessToken: string;
   initialValue?: string;
   onLocationSelect: (location: {
     address: string;
@@ -15,6 +16,7 @@ type LocationSearchInputProps = {
 };
 
 export default function LocationSearchInput({
+  accessToken, // ✅ 2. Accept the new prop here
   onLocationSelect,
   initialValue,
   disabled = false,
@@ -22,21 +24,20 @@ export default function LocationSearchInput({
   const geocoderContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (geocoderContainerRef.current) {
+    // Ensure both the container and the token are available
+    if (geocoderContainerRef.current && accessToken) {
       const geocoder = new MapboxGeocoder({
-        accessToken: process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!,
+        accessToken: accessToken, // ✅ 3. Use the prop here instead of process.env
         types: "country,region,place,postcode,locality,neighborhood,address",
-        marker: false, // We don't need a map marker here
+        marker: false,
       });
 
       geocoder.addTo(geocoderContainerRef.current);
 
-      // Set the initial value if provided
       if (initialValue) {
         geocoder.setInput(initialValue);
       }
 
-      // Listen for the 'result' event
       geocoder.on(
         "result",
         (e: { result: { place_name: string; center: [number, number] } }) => {
@@ -49,20 +50,18 @@ export default function LocationSearchInput({
         }
       );
 
-      // Listen for the 'clear' event
       geocoder.on("clear", () => {
         onLocationSelect({ address: "", longitude: 0, latitude: 0 });
       });
 
       return () => {
-        // Cleanup on component unmount
         const container = geocoderContainerRef.current;
         if (container && container.firstChild) {
           container.removeChild(container.firstChild);
         }
       };
     }
-  }, []); // Run this effect only once
+  }, [accessToken]); // ✅ 4. Re-run if accessToken changes
 
   return (
     <div

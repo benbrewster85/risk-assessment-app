@@ -36,6 +36,7 @@ type ProjectClientPageProps = {
   teamMembers: TeamMember[];
   currentUserId: string;
   currentUserRole: string;
+  mapboxToken?: string;
 };
 
 export default function ProjectClientPage({
@@ -47,6 +48,7 @@ export default function ProjectClientPage({
   teamMembers,
   currentUserId,
   currentUserRole,
+  mapboxToken,
 }: ProjectClientPageProps) {
   const supabase = createClient();
   const router = useRouter();
@@ -280,6 +282,7 @@ export default function ProjectClientPage({
           onUpdate={setProject}
           isCurrentUserAdmin={isAdmin}
           teamMembers={teamMembers}
+          mapboxToken={mapboxToken}
         />
       ),
     },

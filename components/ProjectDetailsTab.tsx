@@ -11,6 +11,7 @@ type ProjectDetailsTabProps = {
   project: Project;
   teamMembers: TeamMember[];
   isCurrentUserAdmin: boolean;
+  mapboxToken?: string;
   onUpdate: (updatedProject: Project) => void;
 };
 
@@ -24,6 +25,7 @@ const projectStatuses = [
 export default function ProjectDetailsTab({
   project,
   teamMembers,
+  mapboxToken,
   isCurrentUserAdmin,
   onUpdate,
 }: ProjectDetailsTabProps) {
@@ -263,14 +265,24 @@ export default function ProjectDetailsTab({
 
           {/* Site Address Section */}
           <div className="md:col-span-2 lg:col-span-3">
-            <label className="block text-sm font-medium mb-1">
+            <label
+              className="block text-sm font-medium mb-1"
+              htmlFor="site-address"
+            >
               Site Address
             </label>
-            <LocationSearchInput
-              initialValue={address}
-              onLocationSelect={handleLocationSelect}
-              disabled={!isEditing}
-            />
+            {mapboxToken ? (
+              <LocationSearchInput
+                accessToken={mapboxToken}
+                initialValue={project.location_address || ""}
+                onLocationSelect={handleLocationSelect}
+                disabled={!isEditing}
+              />
+            ) : (
+              <div className="p-3 w-full bg-gray-100 text-gray-600 text-sm rounded-md border">
+                Location search is unavailable (Map token not configured).
+              </div>
+            )}
           </div>
         </div>
       </div>
