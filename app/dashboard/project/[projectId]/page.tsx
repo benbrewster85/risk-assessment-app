@@ -78,9 +78,6 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     .single();
   const currentUserRole = profile?.role || "user";
 
-  // ✅ 1. Read the Mapbox token from your environment variables here
-  const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
-
   return (
     <ProjectClientPage
       initialProject={project as Project}
@@ -91,7 +88,6 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       teamMembers={(teamMembersResult.data as TeamMember[]) || []}
       currentUserId={user.id}
       currentUserRole={currentUserRole}
-      mapboxToken={mapboxToken} // ✅ 2. Pass the token as a prop here
     />
   );
 }
