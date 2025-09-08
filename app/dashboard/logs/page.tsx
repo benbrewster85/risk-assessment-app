@@ -55,7 +55,9 @@ export default async function LogsPage() {
       .eq("team_id", teamId),
     supabase
       .from("assets")
-      .select("id, system_id, model")
+      .select(
+        "*, asset_categories!assets_category_id_fkey(asset_category_class)"
+      )
       .eq("team_id", teamId),
     supabase
       .from("vehicles")

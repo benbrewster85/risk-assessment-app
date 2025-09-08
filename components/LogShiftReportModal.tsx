@@ -5,7 +5,14 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-hot-toast";
 import Modal from "./Modal";
 import FormField from "./FormField";
-import { ProjectListItem, TeamMember, Asset, Vehicle, Task } from "@/lib/types";
+import {
+  ProjectListItem,
+  TeamMember,
+  Asset,
+  Vehicle,
+  Task,
+  AssetCategory,
+} from "@/lib/types";
 import Select, { OnChangeValue } from "react-select";
 
 type OptionType = { value: string; label: string };
@@ -61,14 +68,14 @@ export default function LogShiftReportModal({
       })),
     [teamMembers]
   );
-  const assetOptions = useMemo(
-    () =>
-      assets.map((a) => ({
+  const assetOptions = useMemo(() => {
+    return assets
+      .filter((a) => a.asset_categories?.asset_category_class === "Primary")
+      .map((a) => ({
         value: a.id,
         label: `${a.system_id} - ${a.model}`,
-      })),
-    [assets]
-  );
+      }));
+  }, [assets]);
   const vehicleOptions = useMemo(
     () => vehicles.map((v) => ({ value: v.id, label: v.registration_number })),
     [vehicles]

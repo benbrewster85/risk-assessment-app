@@ -7,6 +7,7 @@ import { toast } from "react-hot-toast";
 import LibraryPage from "@/components/LibraryPage";
 import TeamSettingsTab from "@/components/TeamSettingsTab";
 import { useRouter } from "next/navigation";
+import OrgChartTab from "@/components/OrgChartTab";
 
 type EnrichedTeamMember = TeamMember & {
   is_fleet_manager?: boolean;
@@ -266,6 +267,12 @@ export default function TeamPage() {
               Members
             </button>
             <button
+              onClick={() => setActiveTab("orgChart")}
+              className={`${activeTab === "orgChart" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Org Chart
+            </button>
+            <button
               onClick={() => setActiveTab("library")}
               className={`${activeTab === "library" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
             >
@@ -487,6 +494,9 @@ export default function TeamPage() {
               )}
               {activeTab === "settings" && team && (
                 <TeamSettingsTab team={team} />
+              )}
+              {activeTab === "orgChart" && (
+                <OrgChartTab members={teamMembers} jobRoles={jobRoles} />
               )}
             </>
           )}

@@ -199,7 +199,7 @@ export default async function Dashboard() {
     .eq("team_id", teamId);
   const { data: assets } = await supabase
     .from("assets")
-    .select("*")
+    .select("*, asset_categories!assets_category_id_fkey(asset_category_class)")
     .eq("team_id", teamId);
   const { data: vehicles } = await supabase
     .from("vehicles")
