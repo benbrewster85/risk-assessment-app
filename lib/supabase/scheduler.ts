@@ -30,8 +30,12 @@ export async function getSchedulableResources(teamId: string): Promise<Schedulab
   const { data: subTeams, error: sError } = await supabase.from('sub_teams').select('id, name').eq('team_id', teamId);
   if (sError) throw sError;
   
-  const { data: assets, error: aError } = await supabase.from('assets').select('id, system_id, category_id').eq('team_id', teamId);
-  if (aError) throw aError;
+  const { data: assets, error: aError } = await supabase
+    .from('assets')
+    .select('id, system_id, category_id, asset_categories!inner(asset_category_class)')
+    .eq('team_id', teamId)
+    .eq('asset_categories.asset_category_class', 'Primary');
+if (aError) throw aError;
   
   const { data: assetCategories, error: cError } = await supabase.from('asset_categories').select('id, name').eq('team_id', teamId);
   if (cError) throw cError;
