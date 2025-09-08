@@ -62,24 +62,29 @@ export async function POST(req: NextRequest) {
         weather_icon_code: day.weather[0].icon,
       }));
       
-      // ADDED LOG: Confirm before writing to DB
-      console.log(`Upserting ${forecastsToUpsert.length} forecast records for team ${team.id}...`);
+      // --- START OF NEW LOGGING ---
+      console.log(`Attempting to upsert data for team ${team.id}. First record:`, JSON.stringify(forecastsToUpsert[0], null, 2));
 
-      const { error: upsertError } = await supabaseAdmin
+      const { data: upsertData, error: upsertError } = await supabaseAdmin
         .from('daily_forecasts')
-        .upsert(forecastsToUpsert, { onConflict: 'team_id, forecast_date' });
+        .upsert(forecastsToUpsert, { onConflict: 'team_id, forecast_date' })
+        .select(); // IMPORTANT: Added .select() to get a response
       
       if (upsertError) {
-        // ADDED LOG: Log any database write errors
-        console.error(`Supabase upsert error for team ${team.id}:`, upsertError);
+        console.error(`CRITICAL: Supabase upsert failed for team ${team.id}:`, upsertError);
+        // We will continue to the next team instead of stopping
+        continue; 
       }
+
+      console.log(`SUCCESS: Supabase upsert completed for team ${team.id}. Response count:`, upsertData?.length || 0);
+      // --- END OF NEW LOGGING ---
     }
 
-    console.log("Cron job finished successfully.");
+    console.log("Cron job finished.");
     return NextResponse.json({ message: 'Weather update completed successfully.' });
 
   } catch (error: any) {
-    console.error('Cron job failed:', error);
+    console.error('Cron job failed with a catchable error:', error);
     return NextResponse.json({ error: 'Internal Server Error', details: error.message }, { status: 500 });
   }
 }
