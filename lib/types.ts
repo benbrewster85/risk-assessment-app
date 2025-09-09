@@ -25,7 +25,9 @@ export type TeamMember = { id: string; first_name: string | null; last_name: str
 export type RiskAssessmentListItem = { id: string; name: string; description: string | null; created_at: string; };
 export type RiskAssessment = { id: string; name: string; description: string | null; project: Project; };
 export type RaEntry = { id: number; task_description: string | null; hazard_id: string; hazard: { name: string; } | null; risk_id: string; risk: { name: string; } | null; person_affected: string | null; initial_likelihood: number; initial_impact: number; control_measures: string | null; resultant_likelihood: number; resultant_impact: number; };
-export type Team = { id: string; name: string; logo_url: string | null; };
+export type Team = { id: string; name: string; logo_url: string | null; home_location_address?: string | null; // Add this
+  home_location_lat?: number | null;     // Add this
+  home_location_lon?: number | null;};
 export type Signatory = { user_id: string; };
 export type Signature = { user_id: string; signed_at: string; };
 

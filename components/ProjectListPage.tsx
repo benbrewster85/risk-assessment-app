@@ -153,7 +153,7 @@ export default function ProjectListPage({
         confirmText="Delete"
       />
 
-      <div className="p-8">
+      <div className="p-8 relative z-0">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-3xl font-bold">All Projects</h1>
