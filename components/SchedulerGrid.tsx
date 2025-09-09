@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useDrop, DropTargetMonitor } from "react-dnd";
+import { DailyForecast } from "@/lib/supabase/weather";
 import {
   Resource,
   Assignment,
@@ -45,6 +46,7 @@ interface SchedulerGridProps {
   shiftView: ShiftView;
   viewType: ResourceType;
   dayEvents: DayEvent[];
+  forecasts: DailyForecast[];
   isReadOnly: boolean;
   onDrop: (
     item: WorkItem | Assignment,
@@ -125,6 +127,7 @@ export function SchedulerGrid({
   shiftView,
   viewType,
   dayEvents,
+  forecasts,
   isReadOnly,
   onDrop,
   onRemoveAssignment,
@@ -218,6 +221,9 @@ export function SchedulerGrid({
         </div>
         {dates.map((date) => {
           const dateString = date.toISOString().split("T")[0];
+          const forecast = forecasts.find(
+            (f) => f.forecast_date === dateString
+          );
           const eventsForDay = dayEvents.filter((e) => e.date === dateString);
           let columnBgClass = isWeekend(date) ? "bg-slate-100" : "bg-gray-50";
           if (eventsForDay.some((e) => e.type === "event"))
@@ -239,9 +245,29 @@ export function SchedulerGrid({
                   />
                 )}
               </div>
-              <div className="font-semibold text-gray-800">
-                {date.toLocaleDateString("en-US", { weekday: "short" })}
+              {/* Replace the existing date display with this new flex container */}
+              <div className="flex justify-center items-center gap-2">
+                <div className="font-semibold text-gray-800">
+                  {date.toLocaleDateString("en-US", { weekday: "short" })}
+                </div>
+                {/* Weather Icon and Temp */}
+                {forecast && (
+                  <div
+                    className="flex items-center"
+                    title={`${Math.round(forecast.min_temp_celsius)}°C / ${Math.round(forecast.max_temp_celsius)}°C`}
+                  >
+                    <img
+                      src={`https://openweathermap.org/img/wn/${forecast.weather_icon_code}.png`}
+                      alt="weather icon"
+                      className="w-6 h-6 -my-1" // Added negative margin for better alignment
+                    />
+                    <span className="text-xs text-gray-600 font-medium">
+                      {Math.round(forecast.max_temp_celsius)}°
+                    </span>
+                  </div>
+                )}
               </div>
+
               <div className="text-gray-500 text-sm">
                 {date.toLocaleDateString("en-US", {
                   month: "short",

@@ -54,6 +54,10 @@ import {
   BulkAssignFormData,
 } from "@/components/BulkAssignModal";
 
+import { DailyForecast } from "@/lib/supabase/weather";
+
+import { getCachedWeatherForDates } from "@/lib/supabase/scheduler";
+
 type TimeView = "day" | "week" | "month";
 
 type ActiveFilters = {
@@ -68,6 +72,8 @@ export default function SchedulerPage() {
   const router = useRouter();
 
   // --- STATE DECLARATIONS ---
+  const [forecasts, setForecasts] = useState<DailyForecast[]>([]);
+
   const [isLoading, setIsLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState<ResourceType>("personnel");
@@ -102,6 +108,40 @@ export default function SchedulerPage() {
   const [selectedAssignment, setSelectedAssignment] =
     useState<Assignment | null>(null);
 
+  const visibleDates = useMemo(() => {
+    const start = new Date(currentDate);
+    const dates: Date[] = [];
+    switch (timeView) {
+      case "day":
+        dates.push(start);
+        break;
+      case "month":
+        const year = start.getFullYear();
+        const month = start.getMonth();
+        const firstDayOfMonth = new Date(year, month, 1);
+        const lastDayOfMonth = new Date(year, month + 1, 0);
+        let current = new Date(firstDayOfMonth);
+        current.setDate(current.getDate() - current.getDay());
+        while (current <= lastDayOfMonth || current.getDay() !== 0) {
+          // Changed for Sunday start
+          dates.push(new Date(current));
+          current.setDate(current.getDate() + 1);
+          if (dates.length >= 42) break;
+        }
+        break;
+      default:
+        const startOfWeek = new Date(start);
+        startOfWeek.setDate(start.getDate() - start.getDay());
+        for (let i = 0; i < 14; i++) {
+          const date = new Date(startOfWeek);
+          date.setDate(startOfWeek.getDate() + i);
+          dates.push(date);
+        }
+        break;
+    }
+    return dates;
+  }, [currentDate, timeView]);
+
   const fetchData = useCallback(async () => {
     try {
       const profile = await getUserProfile();
@@ -114,11 +154,13 @@ export default function SchedulerPage() {
       if (!teamId) setTeamId(currentTeamId);
       if (!currentUserRole) setCurrentUserRole(profile.role);
 
-      const [resourceData, workItems, schedulerData] = await Promise.all([
-        getSchedulableResources(currentTeamId),
-        getSchedulableWorkItems(currentTeamId),
-        getSchedulerData(currentTeamId),
-      ]);
+      const [resourceData, workItems, schedulerData, weatherData] =
+        await Promise.all([
+          getSchedulableResources(currentTeamId),
+          getSchedulableWorkItems(currentTeamId),
+          getSchedulerData(currentTeamId),
+          getCachedWeatherForDates(currentTeamId, visibleDates),
+        ]);
 
       setAllResources(resourceData.resources);
       setFilterOptions(resourceData.filterOptions);
@@ -126,13 +168,14 @@ export default function SchedulerPage() {
       setAssignments(schedulerData.assignments);
       setNotes(schedulerData.notes);
       setDayEvents(schedulerData.dayEvents);
+      setForecasts(weatherData);
     } catch (error) {
       console.error("Failed to load scheduler data:", error);
       toast.error("Failed to load scheduler data.");
     } finally {
       setIsLoading(false);
     }
-  }, [teamId, currentUserRole]);
+  }, [teamId, currentUserRole, visibleDates]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -445,40 +488,6 @@ export default function SchedulerPage() {
     }
     return 0;
   }, [viewType, activeFilters]);
-
-  const visibleDates = useMemo(() => {
-    const start = new Date(currentDate);
-    const dates: Date[] = [];
-    switch (timeView) {
-      case "day":
-        dates.push(start);
-        break;
-      case "month":
-        const year = start.getFullYear();
-        const month = start.getMonth();
-        const firstDayOfMonth = new Date(year, month, 1);
-        const lastDayOfMonth = new Date(year, month + 1, 0);
-        let current = new Date(firstDayOfMonth);
-        current.setDate(current.getDate() - current.getDay());
-        while (current <= lastDayOfMonth || current.getDay() !== 0) {
-          // Changed for Sunday start
-          dates.push(new Date(current));
-          current.setDate(current.getDate() + 1);
-          if (dates.length >= 42) break;
-        }
-        break;
-      default:
-        const startOfWeek = new Date(start);
-        startOfWeek.setDate(start.getDate() - start.getDay());
-        for (let i = 0; i < 14; i++) {
-          const date = new Date(startOfWeek);
-          date.setDate(startOfWeek.getDate() + i);
-          dates.push(date);
-        }
-        break;
-    }
-    return dates;
-  }, [currentDate, timeView]);
 
   const draggableItems = useMemo((): WorkItem[] => {
     const getAbsencesForView = (currentView: ResourceType) => {
@@ -848,6 +857,7 @@ export default function SchedulerPage() {
                 onDeleteDayEvent={handleDeleteDayEvent}
                 isReadOnly={isReadOnly}
                 onAssignmentClick={handleAssignmentClick}
+                forecasts={forecasts}
               />
             )}
           </div>

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { Resource, WorkItem, Assignment, SchedulerNote, DayEvent, ShiftType, ResourceType } from "@/lib/types";
 import { BulkAssignFormData } from "@/components/BulkAssignModal";
+import { DailyForecast } from "@/lib/supabase/weather";
 
 const supabase = createClient();
 
@@ -343,6 +344,26 @@ export async function deleteDayEvent(eventId: string) {
   if (error) throw error;
 }
 
+export async function getCachedWeatherForDates(teamId: string, dates: Date[]): Promise<DailyForecast[]> {
+  if (!teamId || dates.length === 0) {
+    return [];
+  }
+
+  const dateStrings = dates.map(d => d.toISOString().split('T')[0]);
+  
+  const { data, error } = await supabase
+    .from('daily_forecasts')
+    .select('forecast_date, max_temp_celsius, min_temp_celsius, weather_icon_code')
+    .eq('team_id', teamId)
+    .in('forecast_date', dateStrings);
+
+  if (error) {
+    console.error("Error fetching cached weather:", error);
+    return [];
+  }
+  
+  return data as DailyForecast[];
+}
 // In lib/supabase/scheduler.ts
 
 // In lib/supabase/scheduler.ts
