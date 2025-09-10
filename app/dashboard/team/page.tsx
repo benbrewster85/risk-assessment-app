@@ -49,13 +49,25 @@ export default function TeamPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
       if (user) {
         setCurrentUserId(user.id);
-        const { data: profileData } = await supabase
+        const { data: profiles, error } = await supabase
           .from("profiles")
           .select("role, team_id")
-          .eq("id", user.id)
-          .single();
+          .eq("id", user.id);
+
+        // Check if we got a result and handle errors
+        if (error) {
+          // Optionally set an error state here
+          setLoading(false); // Stop loading on error
+          return; // Exit the function
+        }
+
+        // Get the first profile from the array, or null if it's empty
+        const profileData =
+          profiles && profiles.length > 0 ? profiles[0] : null;
+
         if (profileData && profileData.team_id) {
           setCurrentUserRole(profileData.role);
           const teamId = profileData.team_id;

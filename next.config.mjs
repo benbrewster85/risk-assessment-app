@@ -15,6 +15,20 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@supabase/ssr'],
   },
-};
+  
+async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: "img-src 'self' blob: data: *.supabase.co https://openweathermap.org;",
+          },
+        ],
+      },
+    ];
+}}
+
 
 export default nextConfig;
