@@ -498,6 +498,80 @@ export default function LibraryPage({
           ))}
         </ul>
       </div>
+      {/* --- HAZARDS --- */}
+      <div className="bg-white p-6 rounded-lg shadow">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold">Hazards</h2>
+          <button
+            onClick={() => openModal("hazard")}
+            className="bg-blue-600 text-white font-bold py-2 px-3 text-sm rounded-lg hover:bg-blue-700 flex items-center"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Hazard
+          </button>
+        </div>
+        <ul className="divide-y divide-gray-200">
+          {hazards.map((item) => (
+            <li
+              key={item.id}
+              className="py-2 flex justify-between items-center"
+            >
+              <p>{item.name}</p>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => openModal("hazard", item)}
+                  className="p-1 text-gray-500 hover:text-indigo-600"
+                >
+                  <Edit2 size={16} />
+                </button>
+                <button
+                  onClick={() => setDeletingItem({ ...item, type: "hazard" })}
+                  className="p-1 text-gray-500 hover:text-red-600"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {/* --- RISKS --- */}
+      <div className="bg-white p-6 rounded-lg shadow">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold">Risks</h2>
+          <button
+            onClick={() => openModal("risk")}
+            className="bg-blue-600 text-white font-bold py-2 px-3 text-sm rounded-lg hover:bg-blue-700 flex items-center"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Risk
+          </button>
+        </div>
+        <ul className="divide-y divide-gray-200">
+          {risks.map((item) => (
+            <li
+              key={item.id}
+              className="py-2 flex justify-between items-center"
+            >
+              <p>{item.name}</p>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => openModal("risk", item)}
+                  className="p-1 text-gray-500 hover:text-indigo-600"
+                >
+                  <Edit2 size={16} />
+                </button>
+                <button
+                  onClick={() => setDeletingItem({ ...item, type: "risk" })}
+                  className="p-1 text-gray-500 hover:text-red-600"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
