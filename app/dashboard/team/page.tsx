@@ -183,7 +183,7 @@ export default function TeamPage() {
 
     const filePath = `team-logos/${team.id}/${file.name}`;
     const { error: uploadError } = await supabase.storage
-      .from("team-assets")
+      .from("team-logos")
       .upload(filePath, file, { upsert: true });
 
     if (uploadError) {
@@ -194,7 +194,7 @@ export default function TeamPage() {
 
     const {
       data: { publicUrl },
-    } = supabase.storage.from("team-assets").getPublicUrl(filePath);
+    } = supabase.storage.from("team-logos").getPublicUrl(filePath);
     await handleUpdateTeam({ logo_url: publicUrl });
     toast.success("Logo updated successfully!");
     setUploading(false);

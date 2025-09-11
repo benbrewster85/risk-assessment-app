@@ -5,81 +5,64 @@ export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
   const authToken = (req.headers.get('authorization') || '').split('Bearer ').pop();
-  if (authToken !== process.env.CRON_SECRET) {
+  if (authToken !== process.env.NEXT_PUBLIC_CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    console.log("Cron job started: Initializing Supabase admin client.");
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.CRON_SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
-
-    const openWeatherApiKey = process.env.NEXT_PUBLIC_OPENWEATHERMAP_API_KEY;
-    if (!openWeatherApiKey) throw new Error("OpenWeatherMap API key is not configured.");
-
-    console.log("Fetching teams with locations from the database...");
-    const { data: teams, error: teamsError } = await supabaseAdmin
-      .from('teams')
-      .select('id, home_location_lat, home_location_lon')
-      .not('home_location_lat', 'is', null)
-      .not('home_location_lon', 'is', null);
-
-    if (teamsError) throw teamsError;
-
-    // ADDED LOG: Check how many teams were found
-    console.log(`Found ${teams?.length || 0} teams with locations.`);
-
-    if (!teams || teams.length === 0) {
-      return NextResponse.json({ message: 'Success (no teams with location found).' });
+    const { teamId } = await req.json(); // Expect a teamId in the request
+    if (!teamId) {
+      return NextResponse.json({ error: 'Team ID is required.' }, { status: 400 });
     }
 
-    for (const team of teams) {
-  console.log(`Processing weather for team ID: ${team.id}`);
-  const { id: team_id, home_location_lat, home_location_lon } = team;
-  
-  // This is the correct URL for the One Call 3.0 API
-  const apiUrl = `https://api.openweathermap.org/data/3.0/onecall?lat=${home_location_lat}&lon=${home_location_lon}&exclude=current,minutely,hourly,alerts&appid=${openWeatherApiKey}&units=metric`;
-  
-  const response = await fetch(apiUrl);
-  const data = await response.json();
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
-  if (!data.daily) {
-    console.log(`No daily data from OpenWeatherMap for team ${team.id}. Response:`, data);
-    continue;
-  }
+    const { data: team, error: teamError } = await supabaseAdmin
+      .from('teams')
+      .select('id, home_location_lat, home_location_lon')
+      .eq('id', teamId)
+      .single();
+      
+    if (teamError || !team) {
+       return NextResponse.json({ error: 'Team not found.' }, { status: 404 });
+    }
+    
+    const { home_location_lat, home_location_lon } = team;
+    const openWeatherApiKey = process.env.NEXT_PUBLIC_OPENWEATHERMAP_API_KEY!;
+    
+    const apiUrl = `https://api.openweathermap.org/data/3.0/onecall?lat=${home_location_lat}&lon=${home_location_lon}&exclude=current,minutely,hourly,alerts&appid=${openWeatherApiKey}&units=metric`;
+    const response = await fetch(apiUrl);
+    const data = await response.json();
 
-  const forecastsToUpsert = data.daily.slice(0, 14).map((day: any) => ({
-    team_id: team_id,
-    forecast_date: new Date(day.dt * 1000).toISOString().split('T')[0],
-    max_temp_celsius: day.temp.max,
-    min_temp_celsius: day.temp.min,
-    weather_icon_code: day.weather[0].icon,
-  }));
+    if (!data.daily) {
+      throw new Error(`OpenWeatherMap API error: ${JSON.stringify(data)}`);
+    }
 
-  console.log(`Attempting to upsert ${forecastsToUpsert.length} forecast records for team ${team.id}.`);
-  const { error: upsertError } = await supabaseAdmin
-    .from('daily_forecasts')
-    .upsert(forecastsToUpsert, { onConflict: 'team_id, forecast_date' });
+    const forecastsToUpsert = data.daily.slice(0, 14).map((day: any) => ({
+      team_id: teamId,
+      forecast_date: new Date(day.dt * 1000).toISOString().split('T')[0],
+      max_temp_celsius: day.temp.max,
+      min_temp_celsius: day.temp.min,
+      weather_icon_code: day.weather[0].icon,
+    }));
 
-  if (upsertError) {
-    console.error(`CRITICAL: Supabase upsert failed for team ${team.id}:`, upsertError);
-    continue;
-  }
-}
+    await supabaseAdmin
+      .from('daily_forecasts')
+      .upsert(forecastsToUpsert, { onConflict: 'team_id, forecast_date' });
+      
+    // IMPORTANT: Update the timestamp for the team
+    await supabaseAdmin
+        .from('teams')
+        .update({ weather_last_updated_at: new Date().toISOString() })
+        .eq('id', teamId);
 
-    console.log("Cron job finished.");
     return NextResponse.json({ message: 'Weather update completed successfully.' });
 
   } catch (error: any) {
-    console.error('Cron job failed with a catchable error:', error);
+    console.error('Weather update failed:', error);
     return NextResponse.json({ error: 'Internal Server Error', details: error.message }, { status: 500 });
   }
 }

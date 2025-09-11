@@ -7,6 +7,11 @@ import { toast } from "react-hot-toast";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 export default function LoginForm() {
+  console.log(
+    "Checking Environment Variable:",
+    process.env.NEXT_PUBLIC_SUPABASE_URL
+  );
+
   const supabase = createClient();
   const router = useRouter();
 
