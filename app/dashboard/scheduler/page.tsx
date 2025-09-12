@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "react-hot-toast";
+import { useRouter } from "next/navigation";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import {
@@ -34,7 +35,6 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronLeft, ChevronRight, Filter as FilterIcon } from "lucide-react";
 import {
-  getCachedWeatherForDates,
   getSchedulableResources,
   getSchedulableWorkItems,
   getSchedulerData,
@@ -47,6 +47,7 @@ import {
   deleteNote,
   updateAssignment,
   createBulkAssignments,
+  getCachedWeatherForDates,
 } from "@/lib/supabase/scheduler";
 import { getUserProfile } from "@/lib/supabase/profiles";
 import {
@@ -55,9 +56,6 @@ import {
 } from "@/components/BulkAssignModal";
 
 import { DailyForecast } from "@/lib/supabase/weather";
-import { createClient } from "@/lib/supabase/client"; // Import the client
-
-const supabase = createClient();
 
 type TimeView = "day" | "week" | "month";
 
@@ -69,6 +67,10 @@ type ActiveFilters = {
 };
 
 export default function SchedulerPage() {
+  // --- HOOKS ---
+  const router = useRouter();
+
+  // --- STATE DECLARATIONS ---
   const [forecasts, setForecasts] = useState<DailyForecast[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -139,56 +141,27 @@ export default function SchedulerPage() {
     return dates;
   }, [currentDate, timeView]);
 
-  const fetchAndDisplayWeather = useCallback(
-    async (teamId: string) => {
-      const weatherData = await getCachedWeatherForDates(teamId, visibleDates);
-      setForecasts(weatherData);
-    },
-    [visibleDates]
-  );
-
   const fetchData = useCallback(async () => {
     setIsLoading(true);
+    setForecasts([]); // Clear any old forecast data immediately
+
     try {
       const profile = await getUserProfile();
-      if (!profile || !profile.team_id)
-        throw new Error("Profile or team not found.");
-
-      const currentTeamId = profile.team_id;
-      setTeamId(currentTeamId);
-
-      // Fetch team data to check the last update time
-      const { data: teamData } = await supabase
-        .from("teams")
-        .select("weather_last_updated_at")
-        .eq("id", currentTeamId)
-        .single();
-      const lastUpdated = teamData?.weather_last_updated_at
-        ? new Date(teamData.weather_last_updated_at)
-        : null;
-      const oneDay = 24 * 60 * 60 * 1000;
-      const isStale =
-        !lastUpdated || new Date().getTime() - lastUpdated.getTime() > oneDay;
-
-      if (isStale) {
-        toast.success("Fetching latest weather forecast...");
-        // This securely calls our own backend, which then calls the weather API
-        await fetch("/api/cron/update-weather", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET!}`, // Use the secret here
-          },
-          body: JSON.stringify({ teamId: currentTeamId }),
-        });
+      if (!profile || !profile.team_id) {
+        // If there's no team, we will intentionally leave the forecast empty
+        setIsLoading(false);
+        return;
       }
+      const currentTeamId = profile.team_id;
+      if (!teamId) setTeamId(currentTeamId);
+      if (!currentUserRole) setCurrentUserRole(profile.role);
 
-      const [resourceData, workItems, schedulerData, initialForecasts] =
+      const [resourceData, workItems, schedulerData, weatherData] =
         await Promise.all([
           getSchedulableResources(currentTeamId),
           getSchedulableWorkItems(currentTeamId),
           getSchedulerData(currentTeamId),
-          getCachedWeatherForDates(currentTeamId, visibleDates), // Fetch initial weather
+          getCachedWeatherForDates(currentTeamId, visibleDates),
         ]);
 
       setAllResources(resourceData.resources);
@@ -197,13 +170,14 @@ export default function SchedulerPage() {
       setAssignments(schedulerData.assignments);
       setNotes(schedulerData.notes);
       setDayEvents(schedulerData.dayEvents);
-      setForecasts(initialForecasts); // Corrected variable name
-    } catch (error: any) {
-      toast.error(`Failed to load data: ${error.message}`);
+      setForecasts(weatherData);
+    } catch (error) {
+      console.error("Failed to load scheduler data:", error);
+      toast.error("Failed to load scheduler data.");
     } finally {
       setIsLoading(false);
     }
-  }, [fetchAndDisplayWeather]);
+  }, [teamId, currentUserRole, visibleDates]);
 
   useEffect(() => {
     setIsLoading(true);
