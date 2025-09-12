@@ -1,34 +1,41 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // This block tells Next.js to not fail the build on ESLint errors.
-  // It will still show you the warnings, but it will not stop the deployment.
   eslint: {
     ignoreDuringBuilds: true,
   },
-  
+
   webpack: (config) => {
     config.externals.push({
-        'ws': 'ws'
+      ws: "ws",
     });
     return config;
   },
+
   experimental: {
-    serverComponentsExternalPackages: ['@supabase/ssr'],
+    serverComponentsExternalPackages: ["@supabase/ssr"],
   },
-  
-async headers() {
+
+  // ✅ Corrected syntax: "headers: async () =>"
+  headers: async () => {
     return [
       {
-        source: '/:path*',
+        source: "/:path*",
         headers: [
           {
-            key: 'Content-Security-Policy',
-            value: "img-src 'self' blob: data: *.supabase.co https://openweathermap.org; default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.supabase.co *.tile.openstreetmap.org unpkg.com; font-src 'self'; connect-src 'self' *.supabase.co;",
+            key: "Content-Security-Policy",
+            // ✅ Merged and cleaned up img-src directive
+            value:
+              "default-src 'self'; " +
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+              "style-src 'self' 'unsafe-inline'; " +
+              "img-src 'self' blob: data: *.supabase.co https://openweathermap.org *.tile.openstreetmap.org unpkg.com; " +
+              "font-src 'self'; " +
+              "connect-src 'self' *.supabase.co;",
           },
         ],
       },
     ];
-  }
+  },
 };
 
 export default nextConfig;
