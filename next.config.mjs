@@ -23,14 +23,12 @@ async headers() {
         headers: [
           {
             key: 'Content-Security-Policy',
-            // Your existing policy with the new domains added for map images
-            value:
-              "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.supabase.co *.tile.openstreetmap.org unpkg.com; font-src 'self'; connect-src 'self' *.supabase.co;",
+            value: "img-src 'self' blob: data: *.supabase.co https://openweathermap.org; default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.supabase.co *.tile.openstreetmap.org unpkg.com; font-src 'self'; connect-src 'self' *.supabase.co;",
           },
         ],
       },
     ];
-  },
+  }
 };
 
 export default nextConfig;
