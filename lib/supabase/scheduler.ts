@@ -33,7 +33,7 @@ export async function getSchedulableResources(teamId: string): Promise<Schedulab
   
   const { data: assets, error: aError } = await supabase
     .from('assets')
-    .select('id, system_id, category_id, asset_categories!inner(asset_category_class)')
+    .select('id, system_id, category_id, manufacturer, model, asset_categories!inner(asset_category_class)')
     .eq('team_id', teamId)
     .eq('asset_categories.asset_category_class', 'Primary');
 if (aError) throw aError;
@@ -41,7 +41,7 @@ if (aError) throw aError;
   const { data: assetCategories, error: cError } = await supabase.from('asset_categories').select('id, name').eq('team_id', teamId);
   if (cError) throw cError;
 
-  const { data: vehicles, error: vError } = await supabase.from('vehicles').select('id, registration_number').eq('team_id', teamId);
+  const { data: vehicles, error: vError } = await supabase.from('vehicles').select('id, registration_number, manufacturer, model').eq('team_id', teamId);
   if (vError) throw vError;
 
   // 2. The mapping now uses the nested job_roles object
@@ -61,10 +61,19 @@ if (aError) throw aError;
     name: a.system_id,
     type: 'equipment',
     category_id: a.category_id,
+    manufacturer: a.manufacturer, 
+  model: a.model,               
     color: 'bg-slate-200 text-blue-500 border-blue-300',
   })) || [];
 
-  const allVehicles: Resource[] = vehicles?.map((v: any) => ({ id: v.id, name: v.registration_number, type: 'vehicles',color: 'bg-slate-200 border-green-300 text-green-500', })) || [];
+  const allVehicles: Resource[] = vehicles?.map((v: any) => ({
+  id: v.id,
+  name: v.registration_number,
+  type: 'vehicles',
+  manufacturer: v.manufacturer, 
+  model: v.model,               
+  color: 'bg-slate-200 border-green-300 text-green-500',
+})) || [];
   const allResources = [...personnel, ...equipment, ...allVehicles];
   const lineManagers = profiles?.map((p: any) => ({ id: p.id, name: `${p.first_name || ''} ${p.last_name || ''}`.trim() })) || [];
 

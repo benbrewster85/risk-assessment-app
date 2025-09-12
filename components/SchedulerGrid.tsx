@@ -316,10 +316,21 @@ export function SchedulerGrid({
 
                 <div>
                   <div className="font-medium">{resource.name}</div>
-                  {/* This line is changed to use job_role_name */}
+
+                  {/* Subtitle for Personnel */}
                   {resource.type === "personnel" && resource.job_role_name && (
                     <div className="text-xs text-gray-500 font-normal">
                       {resource.job_role_name}
+                    </div>
+                  )}
+
+                  {/* Subtitle for Equipment and Vehicles */}
+                  {(resource.type === "equipment" ||
+                    resource.type === "vehicles") && (
+                    <div className="text-xs text-gray-500 font-normal">
+                      {[resource.manufacturer, resource.model]
+                        .filter(Boolean)
+                        .join(" ")}
                     </div>
                   )}
                 </div>

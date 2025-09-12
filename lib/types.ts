@@ -155,6 +155,8 @@ export interface Resource {
   line_manager_id?: string | null;
   category_id?: string | null;
   job_role_name?: string | null;
+  manufacturer?: string | null;
+  model?: string | null;       
 }
 
 

@@ -27,7 +27,11 @@ const nodeWidth = 172;
 const nodeHeight = 50;
 
 const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
-  dagreGraph.setGraph({ rankdir: "TB" }); // TB = Top to Bottom layout
+  dagreGraph.setGraph({
+    rankdir: "TB",
+    ranksep: 100, // Increase vertical spacing
+    nodesep: 20, // Increase horizontal spacing
+  });
 
   nodes.forEach((node) => {
     dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
