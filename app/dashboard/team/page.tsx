@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { TeamMember, Team, AssetCategory } from "@/lib/types";
+import { TeamMember, Team, AssetCategory } from "@/lib/types"; // Make sure to define AbsenceType here
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import LibraryPage from "@/components/LibraryPage";
@@ -17,6 +17,13 @@ type EnrichedTeamMember = TeamMember & {
   line_manager_id?: string | null;
 };
 type LibraryItem = { id: string; name: string; is_system_status?: boolean };
+// Define the new AbsenceType based on your schema
+export type AbsenceType = {
+  id: string;
+  name: string;
+  color: string;
+  category: "personnel" | "vehicle" | "equipment";
+};
 
 export default function TeamPage() {
   const supabase = createClient();
@@ -33,6 +40,7 @@ export default function TeamPage() {
   const [competencies, setCompetencies] = useState<LibraryItem[]>([]);
   const [jobRoles, setJobRoles] = useState<LibraryItem[]>([]);
   const [subTeams, setSubTeams] = useState<LibraryItem[]>([]);
+  const [absenceTypes, setAbsenceTypes] = useState<AbsenceType[]>([]); // New state for absence types
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -44,7 +52,6 @@ export default function TeamPage() {
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-    // This comprehensive data fetching function is from your original code
     const fetchData = async () => {
       setLoading(true);
       const {
@@ -60,9 +67,8 @@ export default function TeamPage() {
 
         // Check if we got a result and handle errors
         if (error) {
-          // Optionally set an error state here
-          setLoading(false); // Stop loading on error
-          return; // Exit the function
+          setLoading(false);
+          return;
         }
 
         // Get the first profile from the array, or null if it's empty
@@ -83,6 +89,7 @@ export default function TeamPage() {
             competenciesResult,
             jobRolesResult,
             subTeamsResult,
+            absenceTypesResult, // Fetch absence types
           ] = await Promise.all([
             supabase
               .from("profiles")
@@ -130,6 +137,11 @@ export default function TeamPage() {
               .select("id, name")
               .eq("team_id", teamId)
               .order("name"),
+            supabase // New query
+              .from("absence_types")
+              .select("id, name, color, category")
+              .eq("team_id", teamId)
+              .order("name"),
           ]);
 
           if (membersResult.data) setTeamMembers(membersResult.data);
@@ -147,6 +159,7 @@ export default function TeamPage() {
           if (competenciesResult.data) setCompetencies(competenciesResult.data);
           if (jobRolesResult.data) setJobRoles(jobRolesResult.data);
           if (subTeamsResult.data) setSubTeams(subTeamsResult.data);
+          if (absenceTypesResult.data) setAbsenceTypes(absenceTypesResult.data); // Set state for absence types
         }
       }
       setLoading(false);
@@ -535,10 +548,11 @@ export default function TeamPage() {
                   teamId={team.id}
                   jobRoles={jobRoles}
                   subTeams={subTeams}
+                  absenceTypes={absenceTypes}
                 />
               )}
 
-              {/* Settings Tab */}
+              {/* --- Other Tabs (Unchanged) --- */}
               {activeTab === "settings" && team && (
                 <TeamSettingsTab
                   team={team}
@@ -553,10 +567,9 @@ export default function TeamPage() {
               {activeTab === "orgChart" && (
                 <OrgChartTab members={teamMembers} jobRoles={jobRoles} />
               )}
-              {activeTab === "matrix" &&
-                team && ( // ADD THIS BLOCK
-                  <CompetencyMatrix teamId={team.id} />
-                )}
+              {activeTab === "matrix" && team && (
+                <CompetencyMatrix teamId={team.id} />
+              )}
             </div>
           </>
         ) : (

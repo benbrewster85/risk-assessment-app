@@ -30,7 +30,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'; " +
               "img-src 'self' blob: data: *.supabase.co https://openweathermap.org *.tile.openstreetmap.org unpkg.com; " +
               "font-src 'self'; " +
-              "connect-src 'self' *.supabase.co;",
+               "connect-src 'self' *.supabase.co https://api.mapbox.com;",
           },
         ],
       },

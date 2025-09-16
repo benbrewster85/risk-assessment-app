@@ -1,5 +1,7 @@
 "use client";
-
+import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns"; // A helper library for formatting dates
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -569,7 +571,7 @@ export default function SchedulerPage() {
           .map(
             (r): WorkItem => ({
               id: r.id,
-              name: r.name,
+              name: [r.name, r.manufacturer, r.model].filter(Boolean).join(" "),
               type: "equipment",
               color: r.color,
             })
@@ -579,7 +581,7 @@ export default function SchedulerPage() {
           .map(
             (r): WorkItem => ({
               id: r.id,
-              name: r.name,
+              name: [r.name, r.manufacturer, r.model].filter(Boolean).join(" "),
               type: "vehicle",
               color: r.color,
             })
@@ -654,6 +656,24 @@ export default function SchedulerPage() {
               >
                 Today
               </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant={"outline"} size="sm">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(currentDate, "PPP")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={currentDate}
+                    onSelect={(date) => {
+                      if (date) setCurrentDate(date);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
               <Button
                 variant="outline"
                 size="sm"

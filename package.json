@@ -27,7 +27,7 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@supabase/auth-ui-react": "^0.4.7",
     "@supabase/auth-ui-shared": "^0.1.8",
-    "@supabase/ssr": "^0.6.1",
+    "@supabase/ssr": "^0.7.0",
     "@types/react-beautiful-dnd": "^13.1.8",
     "@types/react-select": "^5.0.0",
     "class-variance-authority": "^0.7.1",
