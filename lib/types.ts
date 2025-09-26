@@ -203,6 +203,7 @@ export interface NextJobDetails {
   event_date: string;
   shift_pattern: string;
   tasks: TaskSummary[];
+  colleagues: string[] | null;
 }
 
 export type Competency = { 

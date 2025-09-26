@@ -22,6 +22,7 @@ import {
   MapPin, // Added missing icon
 } from "lucide-react";
 import QuickAccess from "@/components/QuickAccess";
+import { Users } from "lucide-react";
 
 // --- Final <NextJob /> Component ---
 const NextJob = ({ job }: { job: NextJobDetails | null }) => {
@@ -83,6 +84,18 @@ const NextJob = ({ job }: { job: NextJobDetails | null }) => {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {job.colleagues && job.colleagues.length > 0 && (
+        <div className="mt-4 border-t pt-4">
+          <h3 className="text-md font-semibold flex items-center">
+            <Users size={16} className="mr-2" />
+            Who's on this shift:
+          </h3>
+          <p className="mt-2 text-sm text-gray-600">
+            {job.colleagues.join(", ")}
+          </p>
         </div>
       )}
 

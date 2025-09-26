@@ -1,7 +1,4 @@
 "use client";
-
-import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Team } from "@/lib/types";
 import {
@@ -12,11 +9,12 @@ import {
   Menu,
 } from "react-feather";
 import { useState, useEffect, useRef } from "react";
+import { signOut } from "@/app/auth/actions";
 
 type HeaderProps = {
   team: Team | null;
   isSuperAdmin: boolean;
-  userName: string | null; // New prop for the user's name
+  userName: string | null;
   onMenuClick: () => void;
 };
 
@@ -26,16 +24,8 @@ export default function Header({
   userName,
   onMenuClick,
 }: HeaderProps) {
-  const supabase = createClient();
-  const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
-  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -127,13 +117,16 @@ export default function Header({
                     )}
                   </div>
                   <div className="border-t border-gray-100 my-1"></div>
-                  <button
-                    onClick={handleLogout}
-                    className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    role="menuitem"
-                  >
-                    Logout
-                  </button>
+
+                  <form action={signOut}>
+                    <button
+                      type="submit"
+                      className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      role="menuitem"
+                    >
+                      Logout
+                    </button>
+                  </form>
                 </div>
               </div>
             )}

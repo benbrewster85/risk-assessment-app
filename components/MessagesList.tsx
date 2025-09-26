@@ -53,10 +53,24 @@ export default function MessagesList({
   };
 
   const handleAcknowledge = async (messageId: number) => {
-    // We will build the full logic for sending a message in the next step
-    alert(`Sending reply: "${replyContent}" to message ID: ${replyingToId}`);
-    setReplyContent("");
-    setReplyingToId(null);
+    // This is the correct logic
+    const originalMessages = [...messages];
+    setMessages((currentMessages) =>
+      currentMessages.map((msg) =>
+        msg.id === messageId
+          ? { ...msg, acknowledged_at: new Date().toISOString() }
+          : msg
+      )
+    );
+
+    const { error } = await supabase.rpc("acknowledge_message", {
+      message_id: messageId,
+    });
+    if (error) {
+      console.error("Error acknowledging message:", error);
+      setError("Could not acknowledge the message.");
+      setMessages(originalMessages); // Revert UI change on error
+    }
   };
   const handleDelete = async (messageId: number) => {
     if (!window.confirm("Are you sure you want to delete this message?"))

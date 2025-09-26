@@ -59,6 +59,17 @@ import {
 
 import { DailyForecast } from "@/lib/supabase/weather";
 import { createClient } from "@/lib/supabase/client"; // Added
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from "@/components/ui/dropdown-menu";
+import { ListFilter } from "lucide-react"; // Add this import
 
 const supabase = createClient(); // Added
 
@@ -111,6 +122,14 @@ export default function SchedulerPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAssignment, setSelectedAssignment] =
     useState<Assignment | null>(null);
+
+  const [draggableItemFilters, setDraggableItemFilters] = useState<string[]>([
+    "project",
+    "equipment",
+    "vehicle",
+    "absence",
+    "personnel",
+  ]);
 
   const visibleDates = useMemo(() => {
     const start = new Date(currentDate);
@@ -268,6 +287,13 @@ export default function SchedulerPage() {
       return { ...prev, [filterKey]: newValues };
     });
   };
+  const handleDraggableFilterChange = (itemType: string) => {
+    setDraggableItemFilters((prev) =>
+      prev.includes(itemType)
+        ? prev.filter((t) => t !== itemType)
+        : [...prev, itemType]
+    );
+  };
 
   const handleAddDayEvent = async (
     date: string,
@@ -396,6 +422,13 @@ export default function SchedulerPage() {
     if (type === "ASSIGNMENT_CARD") {
       const movedAssignment = item as Assignment;
       const previousAssignments = assignments;
+      const targetResource = allResources.find(
+        (r) => r.id === targetResourceId
+      );
+      if (!targetResource) {
+        toast.error("Failed to find target resource.");
+        return;
+      }
       setAssignments((prev) =>
         prev.map((a) =>
           a.id === movedAssignment.id
@@ -409,11 +442,15 @@ export default function SchedulerPage() {
         )
       );
       try {
-        await updateAssignment(movedAssignment.id, {
-          resourceId: targetResourceId,
-          date: targetDate,
-          shift: targetShift,
-        });
+        await updateAssignment(
+          movedAssignment.id,
+          {
+            resourceId: targetResourceId,
+            date: targetDate,
+            shift: targetShift,
+          },
+          targetResource.type
+        );
       } catch (error) {
         toast.error("Failed to move assignment.");
         setAssignments(previousAssignments);
@@ -424,6 +461,8 @@ export default function SchedulerPage() {
     if (type === "WORK_ITEM") {
       const workItem = item as WorkItem;
       let assignmentType: "project" | "equipment" | "vehicle" | "absence";
+
+      // This logic chain now includes 'absence'
       if (workItem.type === "project") {
         assignmentType = "project";
       } else if (workItem.type === "equipment") {
@@ -442,20 +481,11 @@ export default function SchedulerPage() {
           return;
         }
       } else if (workItem.type === "absence") {
+        // <-- THIS LINE WAS MISSING
         assignmentType = "absence";
       } else {
+        // If the type is unknown, do nothing.
         return;
-      }
-
-      let finalWorkItemId = workItem.id;
-      let finalResourceId = targetResourceId;
-
-      if (
-        workItem.type === "personnel" &&
-        (viewType === "equipment" || viewType === "vehicles")
-      ) {
-        finalWorkItemId = targetResourceId;
-        finalResourceId = workItem.id;
       }
 
       const tempId = `temp-${Date.now()}`;
@@ -478,7 +508,6 @@ export default function SchedulerPage() {
         );
         if (!targetResource) throw new Error("Target resource not found");
 
-        // Pass the correctly defined newAssignment
         const savedAssignment = await createAssignment(
           newAssignment,
           teamId,
@@ -590,18 +619,22 @@ export default function SchedulerPage() {
           (item) => item.type === "project"
         );
         const personnelAbsences = getAbsencesForView("personnel");
+
+        // The .filter() method is added here
         return [
           ...equipmentAsWorkItems,
           ...vehiclesAsWorkItems,
           ...projectItems,
           ...personnelAbsences,
-        ];
+        ].filter((item) => draggableItemFilters.includes(item.type));
+
       default:
         return allWorkItems.filter(
           (item) => item.type === "project" || item.type === "absence"
         );
     }
-  }, [viewType, allResources, allWorkItems]);
+    // The dependency array is updated here
+  }, [viewType, allResources, allWorkItems, draggableItemFilters]);
 
   const groupedItems = useMemo(() => {
     return draggableItems.reduce(
@@ -686,6 +719,7 @@ export default function SchedulerPage() {
 
           <div className="mb-4 p-4 bg-white rounded-lg shadow border">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+              {/* Column 1 & 2: Drag to Schedule */}
               <div className="lg:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Drag to Schedule
@@ -706,6 +740,8 @@ export default function SchedulerPage() {
                     ))}
                 </div>
               </div>
+
+              {/* Column 3: Resource Type */}
               <div>
                 <label
                   htmlFor="viewType"
@@ -728,169 +764,220 @@ export default function SchedulerPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Column 4 & 5: Consolidated Filters */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   Filters
                 </label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full mt-1"
-                      disabled={
-                        viewType !== "personnel" && viewType !== "equipment"
-                      }
-                    >
-                      <FilterIcon className="w-4 h-4 mr-2" />
-                      Filter Resources
-                      {activeFilterCount > 0 && (
-                        <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-blue-600 rounded-full">
-                          {activeFilterCount}
-                        </span>
+                <div className="flex items-center gap-2 mt-1">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        disabled={
+                          viewType !== "personnel" && viewType !== "equipment"
+                        }
+                      >
+                        <FilterIcon className="w-4 h-4 mr-2" />
+                        Filter Resources
+                        {activeFilterCount > 0 && (
+                          <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-blue-600 rounded-full">
+                            {activeFilterCount}
+                          </span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-4">
+                      {viewType === "personnel" && (
+                        <div className="space-y-4">
+                          {/* Job Role Filter */}
+                          <div className="space-y-2">
+                            <h4 className="font-medium">Job Role</h4>
+                            <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
+                              {filterOptions.jobRoles.map((role) => (
+                                <div
+                                  key={role.id}
+                                  className="flex items-center space-x-2 mb-1"
+                                >
+                                  <Checkbox
+                                    id={`role-${role.id}`}
+                                    checked={activeFilters.jobRoleIds.includes(
+                                      role.id
+                                    )}
+                                    onCheckedChange={() =>
+                                      handleFilterChange("jobRoleIds", role.id)
+                                    }
+                                  />
+                                  <label
+                                    htmlFor={`role-${role.id}`}
+                                    className="text-sm font-medium leading-none"
+                                  >
+                                    {role.name}
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          {/* Sub-Team Filter */}
+                          <div className="space-y-2">
+                            <h4 className="font-medium">Sub-Team</h4>
+                            <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
+                              {filterOptions.subTeams.map((team) => (
+                                <div
+                                  key={team.id}
+                                  className="flex items-center space-x-2 mb-1"
+                                >
+                                  <Checkbox
+                                    id={`team-${team.id}`}
+                                    checked={activeFilters.subTeamIds.includes(
+                                      team.id
+                                    )}
+                                    onCheckedChange={() =>
+                                      handleFilterChange("subTeamIds", team.id)
+                                    }
+                                  />
+                                  <label
+                                    htmlFor={`team-${team.id}`}
+                                    className="text-sm font-medium leading-none"
+                                  >
+                                    {team.name}
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          {/* Line Manager Filter */}
+                          <div className="space-y-2">
+                            <h4 className="font-medium">Line Manager</h4>
+                            <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
+                              {filterOptions.lineManagers.map((manager) => (
+                                <div
+                                  key={manager.id}
+                                  className="flex items-center space-x-2 mb-1"
+                                >
+                                  <Checkbox
+                                    id={`manager-${manager.id}`}
+                                    checked={activeFilters.lineManagerIds.includes(
+                                      manager.id
+                                    )}
+                                    onCheckedChange={() =>
+                                      handleFilterChange(
+                                        "lineManagerIds",
+                                        manager.id
+                                      )
+                                    }
+                                  />
+                                  <label
+                                    htmlFor={`manager-${manager.id}`}
+                                    className="text-sm font-medium leading-none"
+                                  >
+                                    {manager.name}
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
                       )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-64 p-4">
-                    {viewType === "personnel" && (
-                      <div className="space-y-4">
+                      {viewType === "equipment" && (
                         <div className="space-y-2">
-                          <h4 className="font-medium">Job Role</h4>
+                          <h4 className="font-medium">Equipment Type</h4>
                           <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
-                            {filterOptions.jobRoles.map((role) => (
+                            {filterOptions.assetCategories.map((cat) => (
                               <div
-                                key={role.id}
+                                key={cat.id}
                                 className="flex items-center space-x-2 mb-1"
                               >
                                 <Checkbox
-                                  id={`role-${role.id}`}
-                                  checked={activeFilters.jobRoleIds.includes(
-                                    role.id
-                                  )}
-                                  onCheckedChange={() =>
-                                    handleFilterChange("jobRoleIds", role.id)
-                                  }
-                                />
-                                <label
-                                  htmlFor={`role-${role.id}`}
-                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                >
-                                  {role.name}
-                                </label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <h4 className="font-medium">Sub-Team</h4>
-                          <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
-                            {filterOptions.subTeams.map((team) => (
-                              <div
-                                key={team.id}
-                                className="flex items-center space-x-2 mb-1"
-                              >
-                                <Checkbox
-                                  id={`team-${team.id}`}
-                                  checked={activeFilters.subTeamIds.includes(
-                                    team.id
-                                  )}
-                                  onCheckedChange={() =>
-                                    handleFilterChange("subTeamIds", team.id)
-                                  }
-                                />
-                                <label
-                                  htmlFor={`team-${team.id}`}
-                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                >
-                                  {team.name}
-                                </label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <h4 className="font-medium">Line Manager</h4>
-                          <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
-                            {filterOptions.lineManagers.map((manager) => (
-                              <div
-                                key={manager.id}
-                                className="flex items-center space-x-2 mb-1"
-                              >
-                                <Checkbox
-                                  id={`manager-${manager.id}`}
-                                  checked={activeFilters.lineManagerIds.includes(
-                                    manager.id
+                                  id={`cat-${cat.id}`}
+                                  checked={activeFilters.assetCategoryIds.includes(
+                                    cat.id
                                   )}
                                   onCheckedChange={() =>
                                     handleFilterChange(
-                                      "lineManagerIds",
-                                      manager.id
+                                      "assetCategoryIds",
+                                      cat.id
                                     )
                                   }
                                 />
                                 <label
-                                  htmlFor={`manager-${manager.id}`}
-                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                  htmlFor={`cat-${cat.id}`}
+                                  className="text-sm font-medium leading-none"
                                 >
-                                  {manager.name}
+                                  {cat.name}
                                 </label>
                               </div>
                             ))}
                           </div>
                         </div>
-                      </div>
-                    )}
-                    {viewType === "equipment" && (
-                      <div className="space-y-2">
-                        <h4 className="font-medium">Equipment Type</h4>
-                        <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
-                          {filterOptions.assetCategories.map((cat) => (
-                            <div
-                              key={cat.id}
-                              className="flex items-center space-x-2 mb-1"
-                            >
-                              <Checkbox
-                                id={`cat-${cat.id}`}
-                                checked={activeFilters.assetCategoryIds.includes(
-                                  cat.id
-                                )}
-                                onCheckedChange={() =>
-                                  handleFilterChange("assetCategoryIds", cat.id)
-                                }
-                              />
-                              <label
-                                htmlFor={`cat-${cat.id}`}
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                              >
-                                {cat.name}
-                              </label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div>
-                <label
-                  htmlFor="shiftView"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Shift View
-                </label>
-                <Select
-                  value={shiftView}
-                  onValueChange={(value: ShiftView) => setShiftView(value)}
-                >
-                  <SelectTrigger id="shiftView" className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Shifts</SelectItem>
-                    <SelectItem value="day">Day Only</SelectItem>
-                    <SelectItem value="night">Night Only</SelectItem>
-                  </SelectContent>
-                </Select>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="relative">
+                        <ListFilter className="w-4 h-4 mr-2" />
+                        Filter View
+                        {draggableItemFilters.length < 5 && (
+                          <span className="absolute -top-2 -right-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-blue-600 rounded-full">
+                            {draggableItemFilters.length}
+                          </span>
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuLabel>Show Items</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuCheckboxItem
+                        checked={draggableItemFilters.includes("project")}
+                        onCheckedChange={() =>
+                          handleDraggableFilterChange("project")
+                        }
+                      >
+                        Projects
+                      </DropdownMenuCheckboxItem>
+                      <DropdownMenuCheckboxItem
+                        checked={draggableItemFilters.includes("equipment")}
+                        onCheckedChange={() =>
+                          handleDraggableFilterChange("equipment")
+                        }
+                      >
+                        Equipment
+                      </DropdownMenuCheckboxItem>
+                      <DropdownMenuCheckboxItem
+                        checked={draggableItemFilters.includes("vehicle")}
+                        onCheckedChange={() =>
+                          handleDraggableFilterChange("vehicle")
+                        }
+                      >
+                        Vehicles
+                      </DropdownMenuCheckboxItem>
+
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel>Shift View</DropdownMenuLabel>
+                      <DropdownMenuRadioGroup
+                        value={shiftView}
+                        onValueChange={(value) =>
+                          setShiftView(value as ShiftView)
+                        }
+                      >
+                        <DropdownMenuRadioItem value="all">
+                          All Shifts
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="day">
+                          Day Only
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="night">
+                          Night Only
+                        </DropdownMenuRadioItem>
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             </div>
           </div>
@@ -928,6 +1015,7 @@ export default function SchedulerPage() {
                 isReadOnly={isReadOnly}
                 onAssignmentClick={handleAssignmentClick}
                 forecasts={forecasts}
+                activeAssignmentFilters={draggableItemFilters}
               />
             )}
           </div>

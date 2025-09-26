@@ -31,11 +31,9 @@ export default function MessagesPage() {
       setUser(user);
 
       if (user) {
-        // Mark messages as read
         await supabase.rpc("mark_my_messages_as_read");
 
-        // Fetch messages with sender profiles
-        // (Re-using the two-query approach)
+        // --- MESSAGES FETCHING (for context) ---
         const { data: initialMessages } = await supabase
           .from("messages")
           .select("*")
@@ -63,7 +61,7 @@ export default function MessagesPage() {
           setMessages([]);
         }
 
-        // Fetch team members
+        // --- TEAM MEMBERS DEBUGGING ---
         console.log("3. Fetching current user's profile to get team_id...");
         const { data: userProfile, error: profileError } = await supabase
           .from("profiles")
@@ -86,8 +84,14 @@ export default function MessagesPage() {
             .select("id, first_name, last_name, role")
             .eq("team_id", userProfile.team_id);
 
-          if (teamError) setTeamMembers(teamData || []);
+          if (teamError)
+            console.error("Error fetching team members:", teamError);
+          console.log("6. Team members data received:", teamData);
+          setTeamMembers(teamData || []);
         } else {
+          console.log(
+            "5b. No team_id found for the current user in their profile."
+          );
           setTeamMembers([]);
         }
       }

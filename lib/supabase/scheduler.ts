@@ -197,22 +197,38 @@ export async function createAssignment(assignment: Assignment, teamId: string, t
   if (assignment.assignmentType === 'project' || assignment.assignmentType === 'absence') {
     if (assignment.assignmentType === 'project') dataToInsert.project_id = assignment.workItemId;
     else dataToInsert.absence_type_id = assignment.workItemId;
+
     if (targetResourceType === 'personnel') dataToInsert.personnel_id = assignment.resourceId;
     else if (targetResourceType === 'equipment') dataToInsert.asset_id = assignment.resourceId;
     else if (targetResourceType === 'vehicles') dataToInsert.vehicle_id = assignment.resourceId;
+    
   } else if (assignment.assignmentType === 'equipment' || assignment.assignmentType === 'vehicle') {
-    dataToInsert.personnel_id = assignment.resourceId;
-    if (assignment.assignmentType === 'equipment') dataToInsert.asset_id = assignment.workItemId;
-    else dataToInsert.vehicle_id = assignment.workItemId;
+    if (targetResourceType === 'personnel') {
+        dataToInsert.personnel_id = assignment.resourceId;
+        if (assignment.assignmentType === 'equipment') {
+            dataToInsert.asset_id = assignment.workItemId;
+        } else {
+            dataToInsert.vehicle_id = assignment.workItemId;
+        }
+    } else {
+        dataToInsert.personnel_id = assignment.workItemId;
+        if (assignment.assignmentType === 'equipment') {
+            dataToInsert.asset_id = assignment.resourceId;
+        } else {
+            dataToInsert.vehicle_id = assignment.resourceId;
+        }
+    }
   }
 
   const { data, error } = await supabase.from('schedule_assignments').insert(dataToInsert).select().single();
   if (error) { console.error("Supabase insert error:", error); throw error; }
 
+  // The logic in the return statement is now corrected
   return {
     id: data.id, date: data.assignment_date, shift: data.shift,
     resourceId: data.personnel_id || data.asset_id || data.vehicle_id,
-    workItemId: data.project_id || data.asset_id || data.vehicle_id || data.absence_type_id,
+    // ✅ CORRECTED ORDER: Check for project/absence IDs first.
+    workItemId: data.project_id || data.absence_type_id || data.asset_id || data.vehicle_id,
     assignmentType: assignment.assignmentType,
     duration: assignment.duration,
   } as Assignment;
@@ -304,15 +320,37 @@ export async function deleteAssignment(assignmentId: string) {
 // UPDATES an existing assignment in the database
 export async function updateAssignment(
   assignmentId: string,
-  updates: { resourceId: string; date: string; shift: ShiftType }
+  updates: { resourceId: string; date: string; shift: ShiftType },
+  targetResourceType: ResourceType // <-- Add this new parameter
 ) {
+  const updatePayload: { [key: string]: any } = {
+    assignment_date: updates.date,
+    shift: updates.shift,
+    // Reset all resource type IDs to null before setting the correct one
+    personnel_id: null,
+    asset_id: null,
+    vehicle_id: null,
+  };
+
+  // Dynamically set the correct ID based on the resource type
+  switch (targetResourceType) {
+    case 'personnel':
+      updatePayload.personnel_id = updates.resourceId;
+      break;
+    case 'equipment':
+      updatePayload.asset_id = updates.resourceId;
+      break;
+    case 'vehicles':
+      updatePayload.vehicle_id = updates.resourceId;
+      break;
+    default:
+      // Optional: handle an unknown type if necessary
+      throw new Error(`Invalid target resource type: ${targetResourceType}`);
+  }
+
   const { error } = await supabase
     .from('schedule_assignments')
-    .update({
-      personnel_id: updates.resourceId,
-      assignment_date: updates.date,
-      shift: updates.shift,
-    })
+    .update(updatePayload)
     .eq('id', assignmentId);
 
   if (error) throw error;

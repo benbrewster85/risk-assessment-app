@@ -61,7 +61,8 @@ interface SchedulerGridProps {
   onDeleteNote: (noteId: string) => void;
   onAddDayEvent: (date: string, text: string, type: DayEvent["type"]) => void;
   onDeleteDayEvent: (eventId: string) => void;
-  onAssignmentClick: (assignment: Assignment) => void; // <-- Add prop
+  onAssignmentClick: (assignment: Assignment) => void;
+  activeAssignmentFilters: string[];
 }
 
 interface DroppableCellProps {
@@ -128,6 +129,7 @@ export function SchedulerGrid({
   viewType,
   dayEvents,
   forecasts,
+  activeAssignmentFilters,
   isReadOnly,
   onDrop,
   onRemoveAssignment,
@@ -159,6 +161,7 @@ export function SchedulerGrid({
     return (
       <>
         {assignments
+          .filter((a) => activeAssignmentFilters.includes(a.assignmentType))
           .filter((a) => {
             if (a.shift !== shift || a.date !== dateString) return false;
             return a.resourceId === resource.id || a.workItemId === resource.id;

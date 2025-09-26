@@ -46,7 +46,6 @@ export function NoteCard({
       await onUpdate(note.id, editText.trim());
       setIsEditing(false);
     } catch (error) {
-      // Error handling is done in parent component
       console.error("Failed to save note:", error);
     } finally {
       setIsSaving(false);
@@ -56,8 +55,6 @@ export function NoteCard({
   const handleCancel = () => {
     setEditText(note.text);
     setIsEditing(false);
-
-    // If this was a new note that's empty, delete it
     if (note.text === "") {
       handleDelete();
     }
@@ -114,12 +111,14 @@ export function NoteCard({
   }
 
   return (
-    <div className="p-2 bg-yellow-50 border border-yellow-200 rounded w-full group">
+    // ✅ CHANGED: Added 'relative' to make this the positioning container for the buttons
+    <div className="relative p-2 bg-yellow-50 border border-yellow-200 rounded w-full group">
       <div className="text-xs text-gray-700 whitespace-pre-wrap break-words">
         {note.text}
       </div>
       {!isReadOnly && (
-        <div className="flex justify-end gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        // ✅ CHANGED: Positioned the button container absolutely in the top right
+        <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
             size="sm"
             variant="ghost"
