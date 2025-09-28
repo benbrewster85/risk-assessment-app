@@ -8,7 +8,7 @@ import {
   VehicleEvent,
   VehicleMileageLog,
   VehicleActivityLog,
-  EventLog,
+  Assignment, // <-- IMPORT
 } from "@/lib/types";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
@@ -29,6 +29,8 @@ import ResolveVehicleIssueModal from "./ResolveVehicleIssueModal";
 import StorageImage from "./StorageImage";
 import Modal from "./Modal";
 import ViewReportModal from "./ViewReportModal";
+import { BulkAssignModal, BulkAssignFormData } from "./BulkAssignModal"; // <-- IMPORT
+import { format } from "date-fns"; // <-- IMPORT
 
 type VehicleDetailPageProps = {
   initialVehicle: Vehicle;
@@ -85,6 +87,13 @@ export default function VehicleDetailPage({
   );
   const [viewingReportId, setViewingReportId] = useState<string | null>(null);
 
+  // --- NEW STATE FOR DYNAMIC ASSIGNMENTS ---
+  const [currentHolder, setCurrentHolder] = useState<any>(null);
+  const [isBulkAssignModalOpen, setIsBulkAssignModalOpen] = useState(false);
+  const [assignmentForModal, setAssignmentForModal] =
+    useState<Assignment | null>(null);
+  const [scheduleAssignee, setScheduleAssignee] = useState("");
+
   useEffect(() => {
     setVehicle(initialVehicle);
     setEvents(initialEvents);
@@ -93,20 +102,21 @@ export default function VehicleDetailPage({
     setSelectedAssignee(initialVehicle.current_assignee_id || "");
   }, [initialVehicle, initialEvents, initialMileageLogs, initialActivityLog]);
 
-  const handleAssign = async () => {
-    setIsAssigning(true);
-    const { error } = await supabase
-      .from("vehicles")
-      .update({ current_assignee_id: selectedAssignee || null })
-      .eq("id", vehicle.id);
-    if (error) {
-      toast.error(`Failed to assign vehicle: ${error.message}`);
-    } else {
-      toast.success("Vehicle assigned successfully!");
-      router.refresh();
-    }
-    setIsAssigning(false);
-  };
+  // --- NEW EFFECT TO FETCH CURRENT HOLDER ---
+  useEffect(() => {
+    const fetchHolderStatus = async () => {
+      if (!vehicle.id) return;
+      const { data, error } = await supabase.rpc("get_current_vehicle_holder", {
+        p_vehicle_id: vehicle.id,
+      });
+      if (error) {
+        console.error("Error fetching vehicle holder:", error);
+      } else {
+        setCurrentHolder(data);
+      }
+    };
+    fetchHolderStatus();
+  }, [vehicle.id, supabase]);
 
   const handleLogSuccess = (newEvent: VehicleEvent) => {
     router.refresh();
@@ -134,14 +144,56 @@ export default function VehicleDetailPage({
 
   const handleIssueResolved = (updatedEvent: VehicleEvent) => {
     setEvents(
-      paginatedEvents.map((event) =>
+      events.map((event) =>
         event.id === updatedEvent.id ? updatedEvent : event
       )
     );
   };
 
-  const assigneeName =
-    `${(vehicle as any).assignee_first_name || ""} ${(vehicle as any).assignee_last_name || ""}`.trim();
+  // --- NEW HANDLERS FOR SCHEDULING MODAL ---
+  const handleOpenBulkAssign = () => {
+    if (!scheduleAssignee) {
+      toast.error("Please select a person to assign the vehicle to.");
+      return;
+    }
+    const seedAssignment: Assignment = {
+      id: `temp-${Date.now()}`,
+      resourceId: vehicle.id, // The vehicle is the resource
+      workItemId: scheduleAssignee,
+      date: new Date().toISOString(),
+      shift: "day",
+      assignmentType: "vehicle", // Important for the scheduler
+    };
+    setAssignmentForModal(seedAssignment);
+    setIsBulkAssignModalOpen(true);
+  };
+
+  const handleBulkAssignSave = async (formData: BulkAssignFormData) => {
+    if (!assignmentForModal || !formData.startDate) {
+      toast.error("Something went wrong, missing assignment data.");
+      return;
+    }
+    const shiftsToAssign =
+      formData.shift === "both" ? ["day", "night"] : [formData.shift];
+    const { error } = await supabase.rpc("create_bulk_vehicle_assignments", {
+      p_vehicle_id: assignmentForModal.resourceId,
+      p_personnel_id: assignmentForModal.workItemId,
+      p_team_id: vehicle.team_id,
+      p_start_date: format(formData.startDate, "yyyy-MM-dd"),
+      p_end_date: formData.endDate
+        ? format(formData.endDate, "yyyy-MM-dd")
+        : format(formData.startDate, "yyyy-MM-dd"),
+      p_shifts: shiftsToAssign,
+    });
+    if (error) {
+      toast.error(`Failed to create assignments: ${error.message}`);
+    } else {
+      toast.success("Assignments created successfully!");
+      router.refresh();
+    }
+    setIsBulkAssignModalOpen(false);
+  };
+
   const serviceDueDate =
     vehicle.last_serviced_date && vehicle.service_cycle_months
       ? new Date(
@@ -224,11 +276,34 @@ export default function VehicleDetailPage({
                 </div>
               </div>
               <div className="md:col-span-1 space-y-4">
+                {/* --- NEW DYNAMIC STATUS DISPLAY --- */}
                 <div className="p-4 bg-slate-50 rounded-lg">
-                  <p className="text-sm font-medium">Currently Assigned To</p>
-                  <p className="text-xl font-bold mt-1">
-                    {assigneeName || "--"}
-                  </p>
+                  <p className="text-sm font-medium">Current Status</p>
+                  {currentHolder ? (
+                    <>
+                      {currentHolder.type === "Unavailable" ? (
+                        <p className="text-xl font-bold mt-1 text-orange-600">
+                          Unavailable
+                        </p>
+                      ) : (
+                        <p className="text-xl font-bold mt-1">
+                          {currentHolder.type === "Unassigned"
+                            ? "Unassigned"
+                            : `${currentHolder.first_name || ""} ${
+                                currentHolder.last_name || ""
+                              }`}
+                          {currentHolder.type !== "Unassigned" && (
+                            <span className="text-sm font-normal text-gray-500 ml-2">
+                              ({currentHolder.type})
+                            </span>
+                          )}
+                        </p>
+                      )}
+                      <p className="text-xs mt-1">{currentHolder.context}</p>
+                    </>
+                  ) : (
+                    <p>Loading status...</p>
+                  )}
                 </div>
                 <div className="p-4 bg-slate-50 rounded-lg">
                   <p className="text-sm font-medium">Service Status</p>
@@ -261,34 +336,44 @@ export default function VehicleDetailPage({
                     </p>
                   )}
                 </div>
+                {/* --- NEW SCHEDULING CONTROLS --- */}
                 {isCurrentUserAdmin && (
                   <div className="p-4 bg-slate-50 rounded-lg">
-                    <label htmlFor="assignee" className="text-sm font-medium">
-                      Re-assign To
+                    <label className="text-sm font-medium">
+                      Schedule Assignment
                     </label>
-                    <div className="flex items-center space-x-2 mt-2">
-                      <select
-                        id="assignee"
-                        value={selectedAssignee}
-                        onChange={(e) => setSelectedAssignee(e.target.value)}
-                        className="block w-full rounded-md border-gray-300 shadow-sm"
-                      >
-                        <option value="">(Un-assign)</option>
-                        {teamMembers.map((member) => (
-                          <option
-                            key={member.id}
-                            value={member.id}
-                          >{`${member.first_name} ${member.last_name}`}</option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={handleAssign}
-                        disabled={isAssigning}
-                        className="py-2 px-4 border rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 flex-shrink-0"
-                      >
-                        {isAssigning ? "..." : "Assign"}
-                      </button>
-                    </div>
+                    <fieldset
+                      disabled={currentHolder?.type === "Unavailable"}
+                      className="disabled:opacity-50"
+                    >
+                      <div className="flex items-center space-x-2 mt-2">
+                        <select
+                          value={scheduleAssignee}
+                          onChange={(e) => setScheduleAssignee(e.target.value)}
+                          className="block w-full rounded-md border-gray-300 shadow-sm"
+                        >
+                          <option value="">Select Person...</option>
+                          {teamMembers.map((member) => (
+                            <option
+                              key={member.id}
+                              value={member.id}
+                            >{`${member.first_name} ${member.last_name}`}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={handleOpenBulkAssign}
+                          className="py-2 px-4 border rounded-md text-white bg-blue-600 hover:bg-blue-700 flex-shrink-0"
+                        >
+                          Schedule...
+                        </button>
+                      </div>
+                    </fieldset>
+                    {currentHolder?.type === "Unavailable" && (
+                      <p className="text-xs text-orange-600 mt-2">
+                        This vehicle cannot be scheduled because it is currently{" "}
+                        {currentHolder.context}.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -612,6 +697,20 @@ export default function VehicleDetailPage({
           </div>
         </div>
       </div>
+
+      {/* --- ADD THE MODAL TO THE END OF THE FILE --- */}
+      <BulkAssignModal
+        isOpen={isBulkAssignModalOpen}
+        onClose={() => setIsBulkAssignModalOpen(false)}
+        assignment={assignmentForModal}
+        onSave={handleBulkAssignSave}
+        workItems={teamMembers.map((tm) => ({
+          id: tm.id,
+          name: `${tm.first_name} ${tm.last_name}`,
+          type: "personnel",
+          color: "bg-gray-200",
+        }))}
+      />
     </>
   );
 }

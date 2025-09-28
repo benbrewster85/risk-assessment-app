@@ -8,6 +8,7 @@ import {
   AssetIssue,
   AssetActivityLog,
   EventLog,
+  Assignment,
 } from "@/lib/types";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
@@ -31,6 +32,8 @@ import ResolveIssueModal from "./ResolveIssueModal";
 import StorageImage from "./StorageImage";
 import AssetQrCode from "./AssetQrCode";
 import ViewReportModal from "./ViewReportModal"; // CORRECT: Imports the new master modal
+import { BulkAssignModal, BulkAssignFormData } from "./BulkAssignModal";
+import { format } from "date-fns";
 
 type ChildAsset = { id: string; system_id: string; model: string | null };
 type Status = { id: string; name: string };
@@ -78,6 +81,27 @@ export default function AssetDetailPage({
   const [issuesPage, setIssuesPage] = useState(1);
   const [activityLogPage, setActivityLogPage] = useState(1);
   const [viewingReportId, setViewingReportId] = useState<string | null>(null); // CORRECT: State holds the ID
+  const [currentHolder, setCurrentHolder] = useState<any>(null);
+  const [isBulkAssignModalOpen, setIsBulkAssignModalOpen] = useState(false);
+  const [assignmentForModal, setAssignmentForModal] =
+    useState<Assignment | null>(null);
+
+  useEffect(() => {
+    const fetchHolderStatus = async () => {
+      if (!asset.id) return;
+      // This 'rpc' call is how we run our special database function
+      const { data, error } = await supabase.rpc("get_current_asset_holder", {
+        p_asset_id: asset.id,
+      });
+
+      if (error) {
+        console.error("Error fetching asset holder:", error);
+      } else {
+        setCurrentHolder(data);
+      }
+    };
+    fetchHolderStatus();
+  }, [asset.id, supabase]);
 
   useEffect(() => {
     setAsset(initialAsset);
@@ -86,21 +110,21 @@ export default function AssetDetailPage({
     setActivityLog(initialActivityLog);
   }, [initialAsset, childAssets, initialIssues, initialActivityLog]);
 
-  const handleAssign = async () => {
-    setIsAssigning(true);
-    const { error } = await supabase.rpc("assign_asset_with_children", {
-      p_asset_id: asset.id,
-      p_new_assignee_id: selectedAssignee || null,
-      p_team_id: asset.team_id,
-    });
-    if (error) {
-      toast.error(`Failed to assign asset: ${error.message}`);
-    } else {
-      toast.success("Asset assigned successfully!");
-      router.refresh();
-    }
-    setIsAssigning(false);
-  };
+  //const handleAssign = async () => {
+  //  setIsAssigning(true);
+  //  const { error } = await supabase.rpc("assign_asset_with_children", {
+  //    p_asset_id: asset.id,
+  //    p_new_assignee_id: selectedAssignee || null,
+  //    p_team_id: asset.team_id,
+  //  });
+  //  if (error) {
+  //    toast.error(`Failed to assign asset: ${error.message}`);
+  //  } else {
+  //    toast.success("Asset assigned successfully!");
+  //    router.refresh();
+  //  }
+  //  setIsAssigning(false);
+  //};
 
   const handleAssociateChild = async () => {
     if (!selectedChildId) {
@@ -213,6 +237,67 @@ export default function AssetDetailPage({
   if (!asset) {
     return <p className="p-8">Loading asset details...</p>;
   }
+
+  // State for our new scheduling form
+  const [scheduleAssignee, setScheduleAssignee] = useState("");
+
+  const handleOpenBulkAssign = () => {
+    if (!scheduleAssignee) {
+      toast.error("Please select a person to assign the asset to.");
+      return;
+    }
+
+    // Create a temporary "seed" assignment object to pass to the modal
+    const seedAssignment: Assignment = {
+      id: `temp-${Date.now()}`,
+      resourceId: asset.id,
+      workItemId: scheduleAssignee,
+      date: new Date().toISOString(), // The modal will allow changing this
+      shift: "day",
+      assignmentType: "equipment",
+    };
+
+    setAssignmentForModal(seedAssignment);
+    setIsBulkAssignModalOpen(true);
+  };
+
+  // New form to render on the page
+
+  const handleBulkAssignSave = async (formData: BulkAssignFormData) => {
+    if (!assignmentForModal || !formData.startDate) {
+      toast.error("Something went wrong, missing assignment data.");
+      return;
+    }
+
+    // Determine which shifts to include based on modal selection
+    const shiftsToAssign =
+      formData.shift === "both" ? ["day", "night"] : [formData.shift];
+
+    // Note: Your create_bulk_asset_assignments function doesn't currently handle
+    // the 'includeWeekends' logic. You would need to update the SQL function
+    // to filter out weekends if `formData.includeWeekends` is false.
+    // For now, this will assign for all days in the range.
+
+    const { error } = await supabase.rpc("create_bulk_asset_assignments", {
+      p_asset_id: assignmentForModal.resourceId,
+      p_personnel_id: assignmentForModal.workItemId,
+      p_team_id: asset.team_id,
+      p_start_date: format(formData.startDate, "yyyy-MM-dd"),
+      p_end_date: formData.endDate
+        ? format(formData.endDate, "yyyy-MM-dd")
+        : format(formData.startDate, "yyyy-MM-dd"),
+      p_shifts: shiftsToAssign,
+    });
+
+    if (error) {
+      toast.error(`Failed to create assignments: ${error.message}`);
+    } else {
+      toast.success("Assignments created successfully!");
+      router.refresh();
+    }
+
+    setIsBulkAssignModalOpen(false); // Close the modal
+  };
 
   return (
     <>
@@ -360,10 +445,31 @@ export default function AssetDetailPage({
               </div>
               <div className="lg:col-span-1 space-y-4">
                 <div className="p-4 bg-slate-50 rounded-lg">
-                  <p className="text-sm font-medium">Currently Assigned To</p>
-                  <p className="text-xl font-bold mt-1">
-                    {currentAssigneeName || "In Stores"}
-                  </p>
+                  <p className="text-sm font-medium">Current Status</p>
+                  {currentHolder ? (
+                    <>
+                      {/* ADD THIS NEW 'else if' BLOCK */}
+                      {currentHolder.type === "Unavailable" ? (
+                        <p className="text-xl font-bold mt-1 text-orange-600">
+                          Unavailable
+                        </p>
+                      ) : (
+                        <p className="text-xl font-bold mt-1">
+                          {currentHolder.type === "Unassigned"
+                            ? "Unassigned"
+                            : `${currentHolder.first_name || ""} ${currentHolder.last_name || ""}`}
+                          {currentHolder.type !== "Unassigned" && (
+                            <span className="text-sm font-normal text-gray-500 ml-2">
+                              ({currentHolder.type})
+                            </span>
+                          )}
+                        </p>
+                      )}
+                      <p className="text-xs mt-1">{currentHolder.context}</p>
+                    </>
+                  ) : (
+                    <p>Loading status...</p>
+                  )}
                 </div>
                 <div className="p-4 bg-slate-50 rounded-lg">
                   <p className="text-sm font-medium">Calibration Status</p>
@@ -393,34 +499,45 @@ export default function AssetDetailPage({
                     </p>
                   )}
                 </div>
+
                 {isCurrentUserAdmin && (
                   <div className="p-4 bg-slate-50 rounded-lg">
-                    <label htmlFor="assignee" className="text-sm font-medium">
-                      Re-assign To
+                    <label className="text-sm font-medium">
+                      Schedule Assignment
                     </label>
-                    <div className="flex items-center space-x-2 mt-2">
-                      <select
-                        id="assignee"
-                        value={selectedAssignee}
-                        onChange={(e) => setSelectedAssignee(e.target.value)}
-                        className="block w-full rounded-md border-gray-300 shadow-sm"
-                      >
-                        <option value="">(Back to Stores)</option>
-                        {teamMembers.map((member) => (
-                          <option
-                            key={member.id}
-                            value={member.id}
-                          >{`${member.first_name} ${member.last_name}`}</option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={handleAssign}
-                        disabled={isAssigning}
-                        className="py-2 px-4 border rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 flex-shrink-0"
-                      >
-                        {isAssigning ? "..." : "Assign"}
-                      </button>
-                    </div>
+                    <fieldset
+                      disabled={currentHolder?.type === "Unavailable"}
+                      className="disabled:opacity-50"
+                    >
+                      <div className="flex items-center space-x-2 mt-2">
+                        <select
+                          value={scheduleAssignee}
+                          onChange={(e) => setScheduleAssignee(e.target.value)}
+                          className="block w-full rounded-md border-gray-300 shadow-sm"
+                        >
+                          <option value="">Select Person...</option>
+                          {teamMembers.map((member) => (
+                            <option
+                              key={member.id}
+                              value={member.id}
+                            >{`${member.first_name} ${member.last_name}`}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={handleOpenBulkAssign}
+                          className="py-2 px-4 border rounded-md text-white bg-blue-600 hover:bg-blue-700 flex-shrink-0"
+                        >
+                          Schedule...
+                        </button>
+                      </div>
+                    </fieldset>
+                    {currentHolder?.type === "Unavailable" && (
+                      <p className="text-xs text-orange-600 mt-2">
+                        This asset cannot be scheduled because it is currently
+                        away for {currentHolder.context}. Please update the
+                        scheduler if this asset is available.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -715,6 +832,18 @@ export default function AssetDetailPage({
           </div>
         </div>
       </div>
+      <BulkAssignModal
+        isOpen={isBulkAssignModalOpen}
+        onClose={() => setIsBulkAssignModalOpen(false)}
+        assignment={assignmentForModal}
+        onSave={handleBulkAssignSave}
+        workItems={teamMembers.map((tm) => ({
+          id: tm.id,
+          name: `${tm.first_name} ${tm.last_name}`,
+          type: "personnel",
+          color: "bg-gray-200",
+        }))}
+      />
     </>
   );
 }

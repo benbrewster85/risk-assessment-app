@@ -3,6 +3,7 @@
 import React from "react";
 import { useDrop, DropTargetMonitor } from "react-dnd";
 import { DailyForecast } from "@/lib/supabase/weather";
+import Link from "next/link";
 import {
   Resource,
   Assignment,
@@ -318,7 +319,27 @@ export function SchedulerGrid({
                 )}
 
                 <div>
-                  <div className="font-medium">{resource.name}</div>
+                  <div className="font-medium">
+                    {/* NEW: Conditional Link Logic */}
+                    {resource.type === "equipment" ? (
+                      <Link
+                        href={`/dashboard/assets/${resource.id}`}
+                        className="text-blue-600 hover:underline"
+                      >
+                        {resource.name}
+                      </Link>
+                    ) : resource.type === "vehicles" ? (
+                      <Link
+                        href={`/dashboard/vehicles/${resource.id}`}
+                        className="text-blue-600 hover:underline"
+                      >
+                        {resource.name}
+                      </Link>
+                    ) : (
+                      // For personnel, render plain text as a placeholder
+                      <span>{resource.name}</span>
+                    )}
+                  </div>
 
                   {/* Subtitle for Personnel */}
                   {resource.type === "personnel" && resource.job_role_name && (
