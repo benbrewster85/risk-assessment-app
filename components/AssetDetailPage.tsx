@@ -86,6 +86,10 @@ export default function AssetDetailPage({
   const [assignmentForModal, setAssignmentForModal] =
     useState<Assignment | null>(null);
 
+  const [selectedCustodian, setSelectedCustodian] = useState(
+    initialAsset.current_assignee_id || ""
+  );
+
   useEffect(() => {
     const fetchHolderStatus = async () => {
       if (!asset.id) return;
@@ -240,6 +244,20 @@ export default function AssetDetailPage({
 
   // State for our new scheduling form
   const [scheduleAssignee, setScheduleAssignee] = useState("");
+
+  const handleUpdateCustodian = async () => {
+    const { error } = await supabase
+      .from("assets")
+      .update({ current_assignee_id: selectedCustodian || null }) // Set to null to use the default
+      .eq("id", asset.id);
+
+    if (error) {
+      toast.error(`Failed to update custodian: ${error.message}`);
+    } else {
+      toast.success("Custodian updated successfully!");
+      router.refresh();
+    }
+  };
 
   const handleOpenBulkAssign = () => {
     if (!scheduleAssignee) {
@@ -538,6 +556,39 @@ export default function AssetDetailPage({
                         scheduler if this asset is available.
                       </p>
                     )}
+                  </div>
+                )}
+
+                {isCurrentUserAdmin && (
+                  <div className="p-4 bg-slate-50 rounded-lg">
+                    <label className="text-sm font-medium">
+                      Manage Custodian Override
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Defaults to the category owner. Set a specific person here
+                      to override the default.
+                    </p>
+                    <div className="flex items-center space-x-2 mt-2">
+                      <select
+                        value={selectedCustodian}
+                        onChange={(e) => setSelectedCustodian(e.target.value)}
+                        className="block w-full rounded-md border-gray-300 shadow-sm"
+                      >
+                        <option value="">Use Category Owner (Default)</option>
+                        {teamMembers.map((member) => (
+                          <option
+                            key={member.id}
+                            value={member.id}
+                          >{`${member.first_name} ${member.last_name}`}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleUpdateCustodian}
+                        className="py-2 px-4 border rounded-md text-white bg-gray-600 hover:bg-gray-700 flex-shrink-0"
+                      >
+                        Update
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

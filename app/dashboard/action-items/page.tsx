@@ -1,8 +1,16 @@
 // app/action-items/page.tsx
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import ActionItems from "@/components/ActionItems"; // Your existing component
-import { Asset, AssetIssue } from "@/lib/types";
+import ActionItems from "@/components/ActionItems";
+import { Asset, AssetIssue, Vehicle, VehicleEvent } from "@/lib/types";
+
+// A type to match the JSON structure from our new SQL function
+type ActionItemsData = {
+  open_asset_issues: AssetIssue[];
+  open_vehicle_issues: VehicleEvent[];
+  assets_requiring_calibration: Asset[];
+  vehicles_requiring_mot: Vehicle[];
+};
 
 export default async function ActionItemsPage() {
   const supabase = createClient();
@@ -13,37 +21,31 @@ export default async function ActionItemsPage() {
     redirect("/login");
   }
 
-  // 1. Fetch Open Issues (full data)
-  const { data: openIssues } = await supabase
-    .rpc("get_my_actionable_issues")
-    .select("*, asset:assets(system_id)");
+  // A single, efficient call to get all action items
+  const { data, error } = await supabase.rpc("get_my_action_items");
 
-  // 2. Fetch Assets for calibration checks
-  const { data: ownedCategories } = await supabase
-    .from("asset_categories")
-    .select("id")
-    .eq("owner_id", user.id);
-
-  let calibrationAssets: Asset[] = [];
-  if (ownedCategories && ownedCategories.length > 0) {
-    const categoryIds = ownedCategories.map((c) => c.id);
-    const { data: assets } = await supabase
-      .from("assets_with_details")
-      .select("*")
-      .in("category_id", categoryIds);
-    if (assets) {
-      calibrationAssets = assets as Asset[];
-    }
+  if (error) {
+    console.error("Error fetching action items:", error);
+    // Handle the error appropriately, maybe show an error message
   }
+
+  // Use a default empty structure if data is null
+  const actionItems: ActionItemsData = data || {
+    open_asset_issues: [],
+    open_vehicle_issues: [],
+    assets_requiring_calibration: [],
+    vehicles_requiring_mot: [],
+  };
 
   return (
     <div className="p-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold">Action Items</h1>
-        {/* We are now using your component on its own dedicated page */}
         <ActionItems
-          assets={calibrationAssets}
-          openIssues={(openIssues as AssetIssue[]) || []}
+          assetIssues={actionItems.open_asset_issues}
+          vehicleIssues={actionItems.open_vehicle_issues}
+          assetsForCalibration={actionItems.assets_requiring_calibration}
+          vehiclesForMot={actionItems.vehicles_requiring_mot}
         />
       </div>
     </div>

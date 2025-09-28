@@ -16,10 +16,11 @@ export default async function MyKitPage() {
   }
 
   // Fetch all assets where the current_assignee_id matches the logged-in user's ID
-  const { data: assignedAssets, error } = await supabase
-    .from("assets_with_details") // Using this view gets category info too
-    .select("*")
-    .eq("current_assignee_id", user.id);
+  const today = new Date().toISOString().split("T")[0];
+
+  const { data: assignedAssets, error } = await supabase.rpc("get_my_kit_bag", {
+    p_date: today,
+  });
 
   if (error) {
     console.error("Error fetching assigned assets:", error);

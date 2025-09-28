@@ -24,6 +24,8 @@ import {
 import QuickAccess from "@/components/QuickAccess";
 import { Users } from "lucide-react";
 
+const today = new Date().toISOString().split("T")[0];
+
 // --- Final <NextJob /> Component ---
 const NextJob = ({ job }: { job: NextJobDetails | null }) => {
   if (!job) {
@@ -115,11 +117,11 @@ const NextJob = ({ job }: { job: NextJobDetails | null }) => {
 
 // --- Full <StatusWidgets /> Component ---
 const StatusWidgets = ({
-  issueCount,
+  actionItemCount,
   messageCount,
   kitCount,
 }: {
-  issueCount: number;
+  actionItemCount: number;
   messageCount: number;
   kitCount: number;
 }) => {
@@ -133,7 +135,7 @@ const StatusWidgets = ({
             <span className="ml-4 text-lg font-medium">Action Items</span>
           </div>
           <span className="bg-orange-500 text-white text-sm font-bold rounded-full h-6 w-6 flex items-center justify-center">
-            {issueCount}
+            {actionItemCount}
           </span>
         </div>
       </Link>
@@ -177,22 +179,23 @@ export default async function Dashboard() {
     redirect("/login");
   }
 
+  // REPLACE WITH THIS CORRECTED BLOCK
   // --- DATA FETCHING ---
-  // Fetch existing data for widgets
-  const { count: openIssuesCount } = await supabase.rpc(
-    "get_my_actionable_issues",
-    {},
-    { count: "exact", head: true }
-  );
+  const today = new Date().toISOString().split("T")[0];
+
+  // Fetch action items data and calculate the total count
+  const { data: actionItemsData } = await supabase.rpc("get_my_action_items");
+  const totalActionItems =
+    (actionItemsData?.open_asset_issues?.length || 0) +
+    (actionItemsData?.open_vehicle_issues?.length || 0) +
+    (actionItemsData?.assets_requiring_calibration?.length || 0) +
+    (actionItemsData?.vehicles_requiring_mot?.length || 0);
+
+  // Fetch other widget data
   const { data: unreadMessagesCount } = await supabase.rpc(
     "get_my_unread_messages_count"
   );
   const { data: nextJob } = await supabase.rpc("get_my_next_job");
-
-  const { count: assignedItemCount } = await supabase
-    .from("assets")
-    .select("*", { count: "exact", head: true })
-    .eq("current_assignee_id", user.id);
 
   // NEW: Fetch data required for the modals
   const { data: userProfile } = await supabase
@@ -210,10 +213,17 @@ export default async function Dashboard() {
     .from("profiles")
     .select("*")
     .eq("team_id", teamId);
-  const { data: assets } = await supabase
-    .from("assets")
-    .select("*, asset_categories!assets_category_id_fkey(asset_category_class)")
-    .eq("team_id", teamId);
+  const { data: assets, error: myAssetsError } = await supabase.rpc(
+    "get_my_kit_bag",
+    {
+      p_date: today,
+    }
+  );
+
+  if (myAssetsError) {
+    console.error("Error fetching my kit bag:", myAssetsError);
+    // Handle the error appropriately
+  }
   const { data: vehicles } = await supabase
     .from("vehicles")
     .select("*")
@@ -238,9 +248,9 @@ export default async function Dashboard() {
           </div>
           <div className="lg:col-span-1">
             <StatusWidgets
-              issueCount={openIssuesCount || 0}
+              actionItemCount={totalActionItems}
               messageCount={unreadMessagesCount || 0}
-              kitCount={assignedItemCount || 0} // <-- ADD THIS PROP
+              kitCount={assets?.length || 0}
             />
           </div>
         </div>
