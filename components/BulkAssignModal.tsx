@@ -26,7 +26,8 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Assignment, WorkItem } from "@/lib/types";
 import { Calendar as CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
+import { format, isBefore } from "date-fns";
+import { DateRange, DayPicker } from "react-day-picker";
 
 export type BulkAssignFormData = {
   startDate: Date | undefined;
@@ -50,20 +51,34 @@ export function BulkAssignModal({
   workItems,
   onSave,
 }: BulkAssignModalProps) {
-  const [startDate, setStartDate] = useState<Date | undefined>();
-  const [endDate, setEndDate] = useState<Date | undefined>();
+  // --- STATE CHANGE: Use a single state for the date range ---
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [shift, setShift] = useState<"day" | "night" | "both">("both");
   const [includeWeekends, setIncludeWeekends] = useState(false);
+  const [month, setMonth] = useState<Date | undefined>();
+
+  // --- NEW: State to track if we're using the initial default date ---
+  const [isInitialDate, setIsInitialDate] = useState(false);
 
   useEffect(() => {
-    if (assignment) {
-      const initialDate = new Date(assignment.date);
-      setStartDate(initialDate);
-      setEndDate(initialDate);
+    if (isOpen) {
+      if (assignment) {
+        const initialDate = new Date(assignment.date);
+        // Set the range to a single day, and flag it as the initial default
+        setDateRange({ from: initialDate, to: initialDate });
+        setMonth(initialDate);
+        setIsInitialDate(true); // This is the key to our new logic
+      } else {
+        // Reset if there's no assignment
+        setDateRange(undefined);
+        setMonth(new Date());
+        setIsInitialDate(false);
+      }
+      // Reset other form fields
       setShift("both");
       setIncludeWeekends(false);
     }
-  }, [assignment]);
+  }, [isOpen, assignment]);
 
   if (!assignment) return null;
 
@@ -73,66 +88,103 @@ export function BulkAssignModal({
   );
 
   const handleSave = () => {
-    onSave({ startDate, endDate, shift, includeWeekends });
+    // Deconstruct the range for the onSave callback
+    onSave({
+      startDate: dateRange?.from,
+      endDate: dateRange?.to,
+      shift,
+      includeWeekends,
+    });
+    onClose();
+  };
+
+  // --- REBUILT: The core logic for intuitive date selection ---
+  const handleDateSelect = (
+    range: DateRange | undefined,
+    selectedDay: Date
+  ) => {
+    // Turn off the special initial date behavior after the first interaction
+    setIsInitialDate(false);
+
+    // If this is the first click after the default was set...
+    if (isInitialDate && dateRange?.from) {
+      // ...treat this click as setting the end date.
+      const startDate = dateRange.from;
+      // Ensure "from" is always before "to"
+      if (isBefore(selectedDay, startDate)) {
+        setDateRange({ from: selectedDay, to: startDate });
+      } else {
+        setDateRange({ from: startDate, to: selectedDay });
+      }
+      return;
+    }
+
+    // For all other cases, use the standard, intuitive "reset and restart" logic
+    // This is the default behavior of the library when a range is already complete.
+    if (dateRange?.from && dateRange?.to) {
+      setDateRange({ from: selectedDay, to: undefined });
+      setMonth(selectedDay);
+    } else {
+      setDateRange(range);
+      // When a start date is picked, jump the calendar view to that month
+      if (range?.from) {
+        setMonth(range.from);
+      }
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
+        {/* ... DialogHeader ... */}
         <DialogHeader>
           <DialogTitle>Bulk Assign: {itemDetails?.name}</DialogTitle>
           <DialogDescription>
             Select a date range and options to create multiple assignments.
           </DialogDescription>
         </DialogHeader>
-
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <label htmlFor="startDate" className="text-right">
-              Start Date
+            <label htmlFor="dateRange" className="text-right">
+              Date Range
             </label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="col-span-3">
+                <Button
+                  variant="outline"
+                  className="col-span-3 justify-start text-left font-normal"
+                >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {startDate ? (
-                    format(startDate, "PPP")
+                  {dateRange?.from ? (
+                    // Display single date differently from a range
+                    dateRange.to && dateRange.to !== dateRange.from ? (
+                      <>
+                        {format(dateRange.from, "LLL d, y")} -{" "}
+                        {format(dateRange.to, "LLL d, y")}
+                      </>
+                    ) : (
+                      format(dateRange.from, "LLL d, y")
+                    )
                   ) : (
-                    <span>Pick a date</span>
+                    <span>Pick a date range</span>
                   )}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
+              <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
-                  mode="single"
-                  selected={startDate}
-                  onSelect={setStartDate}
                   initialFocus
+                  mode="range"
+                  selected={dateRange}
+                  onSelect={handleDateSelect} // The new logic is here
+                  numberOfMonths={2}
+                  // --- NEW: Control the calendar's month view ---
+                  month={month}
+                  onMonthChange={setMonth}
                 />
               </PopoverContent>
             </Popover>
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <label htmlFor="endDate" className="text-right">
-              End Date
-            </label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="col-span-3">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={endDate}
-                  onSelect={setEndDate}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
+          {/* Other form fields remain the same */}
           <div className="grid grid-cols-4 items-center gap-4">
             <label htmlFor="shift" className="text-right">
               Shift
