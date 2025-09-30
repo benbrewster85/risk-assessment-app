@@ -79,43 +79,29 @@ export default function AddProjectModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!teamId) {
+      toast.error("Cannot create a project without a team.");
+      return;
+    }
     setIsSubmitting(true);
 
     const projectData = {
       name,
-      reference: reference || null,
-      cost_code: costCode || null,
-      client_contact: clientContact || null,
-      document_status: status,
-      location_address: siteAddress || null,
-      project_manager_id:
-        projectManagerId === "external" ? null : projectManagerId,
-      project_manager_external_name:
-        projectManagerId === "external" ? projectManagerExternal : null,
-      // This line is now corrected
-      site_lead_id: siteLeadId === "external" ? null : siteLeadId,
-      site_lead_external_name:
-        siteLeadId === "external" ? siteLeadExternal : null,
+      team_id: teamId,
+      document_status: "Request Recieved", // Set a default status
       last_edited_at: new Date().toISOString(),
     };
 
-    const { data, error } = isEditing
-      ? await supabase
-          .from("projects")
-          .update(projectData)
-          .eq("id", projectToEdit!.id)
-          .select()
-          .single()
-      : await supabase
-          .from("projects")
-          .insert({ ...projectData, team_id: teamId })
-          .select()
-          .single();
+    const { data, error } = await supabase
+      .from("projects")
+      .insert(projectData)
+      .select()
+      .single();
 
     if (error) {
-      toast.error(`Failed to save project: ${error.message}`);
+      toast.error(`Failed to create project: ${error.message}`);
     } else if (data) {
-      toast.success(`Project ${isEditing ? "updated" : "added"} successfully!`);
+      toast.success(`Project "${data.name}" created successfully!`);
       onSuccess(data as Project);
       onClose();
     }
@@ -133,111 +119,15 @@ export default function AddProjectModal({
       onClose={onClose}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label>Project Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <label>Reference</label>
-            <input
-              type="text"
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-            />
-          </div>
-          <div>
-            <label>Cost Code</label>
-            <input
-              type="text"
-              value={costCode}
-              onChange={(e) => setCostCode(e.target.value)}
-            />
-          </div>
-          <div>
-            <label>Client Contact</label>
-            <input
-              type="text"
-              value={clientContact}
-              onChange={(e) => setClientContact(e.target.value)}
-            />
-          </div>
-          <div>
-            <label>Status</label>
-            <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              {projectStatuses.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-          <div>
-            <label>Project Manager</label>
-            <select
-              value={projectManagerId || ""}
-              onChange={(e) => setProjectManagerId(e.target.value)}
-            >
-              <option value="">Select a team member...</option>
-              {teamMembers.map((m) => (
-                <option
-                  key={m.id}
-                  value={m.id}
-                >{`${m.first_name} ${m.last_name}`}</option>
-              ))}
-              <option value="external">External / Other</option>
-            </select>
-            {projectManagerId === "external" && (
-              <input
-                type="text"
-                value={projectManagerExternal}
-                onChange={(e) => setProjectManagerExternal(e.target.value)}
-                placeholder="Enter external PM name"
-                className="mt-2"
-              />
-            )}
-          </div>
-          <div>
-            <label>Site Lead</label>
-            <select
-              value={siteLeadId || ""}
-              onChange={(e) => setSiteLeadId(e.target.value)}
-            >
-              <option value="">Select a team member...</option>
-              {teamMembers.map((m) => (
-                <option
-                  key={m.id}
-                  value={m.id}
-                >{`${m.first_name} ${m.last_name}`}</option>
-              ))}
-              <option value="external">External / Other</option>
-            </select>
-            {siteLeadId === "external" && (
-              <input
-                type="text"
-                value={siteLeadExternal}
-                onChange={(e) => setSiteLeadExternal(e.target.value)}
-                placeholder="Enter external lead name"
-                className="mt-2"
-              />
-            )}
-          </div>
-        </div>
-
         <div>
-          <label>Site Address</label>
-          <textarea
-            value={siteAddress}
-            onChange={(e) => setSiteAddress(e.target.value)}
-            rows={3}
+          <label className="block mb-2">Project Name</label>
+          <input
+            className="block w-full border rounded-md p-2"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g., New Retail Store Fit-out"
+            required
           />
         </div>
 
@@ -254,11 +144,7 @@ export default function AddProjectModal({
             disabled={isSubmitting}
             className="py-2 px-4 border rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
           >
-            {isSubmitting
-              ? "Saving..."
-              : isEditing
-                ? "Save Changes"
-                : "Create Project"}
+            {isSubmitting ? "Creating..." : "Create Project"}
           </button>
         </div>
       </form>

@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-hot-toast";
 import { Project, TeamMember } from "@/lib/types";
 import ColorPicker from "./ColorPicker";
-import LocationSearchInput from "./LocationSearchInput"; // <-- Make sure this is imported
+import LocationSearchInput from "./LocationSearchInput";
 
 type ProjectDetailsTabProps = {
   project: Project;
@@ -46,14 +46,16 @@ export default function ProjectDetailsTab({
   const [status, setStatus] = useState(
     project.document_status || "Request Recieved"
   );
-  const [pmId, setPmId] = useState(project.project_manager_id || "");
-  const [slId, setSlId] = useState(project.site_lead_id || "");
+  const [pmId, setPmId] = useState("");
+  const [pmExternal, setPmExternal] = useState("");
+  const [slId, setSlId] = useState("");
+  const [slExternal, setSlExternal] = useState("");
   const [jobDescription, setJobDescription] = useState(
     project.job_description || ""
   );
   const [color, setColor] = useState(
     project.color || "bg-slate-200 text-slate-800"
-  ); // <-- 2. Add color state
+  );
 
   useEffect(() => {
     setName(project.name);
@@ -62,13 +64,34 @@ export default function ProjectDetailsTab({
     setCostCode(project.cost_code || "");
     setClientContact(project.client_contact || "");
     setStatus(project.document_status || "Request Recieved");
-    setPmId(project.project_manager_id || "");
-    setSlId(project.site_lead_id || "");
     setJobDescription(project.job_description || "");
-    setAddress(project.location_address || "");
     setLatitude(project.latitude || null);
     setLongitude(project.longitude || null);
-    setColor(project.color || "bg-slate-200 text-slate-800"); // <-- 2. Sync color state
+    setColor(project.color || "bg-slate-200 text-slate-800");
+
+    // **FIXED LOGIC HERE**
+    // This now correctly sets the component state to be the single source of truth.
+    if (project.project_manager_id) {
+      setPmId(project.project_manager_id);
+      setPmExternal("");
+    } else if (project.project_manager_external_name) {
+      setPmId("external");
+      setPmExternal(project.project_manager_external_name);
+    } else {
+      setPmId("");
+      setPmExternal("");
+    }
+
+    if (project.site_lead_id) {
+      setSlId(project.site_lead_id);
+      setSlExternal("");
+    } else if (project.site_lead_external_name) {
+      setSlId("external");
+      setSlExternal(project.site_lead_external_name);
+    } else {
+      setSlId("");
+      setSlExternal("");
+    }
   }, [project]);
 
   const handleLocationSelect = (location: {
@@ -90,13 +113,15 @@ export default function ProjectDetailsTab({
       cost_code: costCode,
       client_contact: clientContact,
       document_status: status,
-      project_manager_id: pmId || null,
-      site_lead_id: slId || null,
+      project_manager_id: pmId === "external" ? null : pmId || null,
+      project_manager_external_name: pmId === "external" ? pmExternal : null,
+      site_lead_id: slId === "external" ? null : slId || null,
+      site_lead_external_name: slId === "external" ? slExternal : null,
       location_address: address,
       latitude: latitude,
       longitude: longitude,
       job_description: jobDescription,
-      color: color, // <-- 3. Add color to the save payload
+      color: color,
       last_edited_at: new Date().toISOString(),
     };
 
@@ -211,21 +236,40 @@ export default function ProjectDetailsTab({
                   Project Manager
                 </label>
                 {isEditing ? (
-                  <select
-                    value={pmId || ""}
-                    onChange={(e) => setPmId(e.target.value)}
-                  >
-                    <option value="">Select a PM...</option>
-                    {teamMembers.map((m) => (
-                      <option
-                        key={m.id}
-                        value={m.id}
-                      >{`${m.first_name} ${m.last_name}`}</option>
-                    ))}
-                  </select>
+                  <>
+                    <select
+                      value={pmId} // **FIXED LOGIC HERE**
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setPmId(value);
+                        if (value !== "external") {
+                          setPmExternal("");
+                        }
+                      }}
+                    >
+                      <option value="">Select a PM...</option>
+                      {teamMembers.map((m) => (
+                        <option
+                          key={m.id}
+                          value={m.id}
+                        >{`${m.first_name} ${m.last_name}`}</option>
+                      ))}
+                      <option value="external">External / Other</option>
+                    </select>
+                    {pmId === "external" && (
+                      <input
+                        type="text"
+                        value={pmExternal}
+                        onChange={(e) => setPmExternal(e.target.value)}
+                        placeholder="Enter external PM name"
+                        className="mt-2"
+                      />
+                    )}
+                  </>
                 ) : (
                   <p className="mt-2">
-                    {getMemberName(project.project_manager_id)}
+                    {project.project_manager_external_name ||
+                      getMemberName(project.project_manager_id)}
                   </p>
                 )}
               </div>
@@ -234,20 +278,41 @@ export default function ProjectDetailsTab({
                   Senior Engineer
                 </label>
                 {isEditing ? (
-                  <select
-                    value={slId || ""}
-                    onChange={(e) => setSlId(e.target.value)}
-                  >
-                    <option value="">Select an Engineer...</option>
-                    {teamMembers.map((m) => (
-                      <option
-                        key={m.id}
-                        value={m.id}
-                      >{`${m.first_name} ${m.last_name}`}</option>
-                    ))}
-                  </select>
+                  <>
+                    <select
+                      value={slId} // **FIXED LOGIC HERE**
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSlId(value);
+                        if (value !== "external") {
+                          setSlExternal("");
+                        }
+                      }}
+                    >
+                      <option value="">Select an Engineer...</option>
+                      {teamMembers.map((m) => (
+                        <option
+                          key={m.id}
+                          value={m.id}
+                        >{`${m.first_name} ${m.last_name}`}</option>
+                      ))}
+                      <option value="external">External / Other</option>
+                    </select>
+                    {slId === "external" && (
+                      <input
+                        type="text"
+                        value={slExternal}
+                        onChange={(e) => setSlExternal(e.target.value)}
+                        placeholder="Enter external engineer name"
+                        className="mt-2"
+                      />
+                    )}
+                  </>
                 ) : (
-                  <p className="mt-2">{getMemberName(project.site_lead_id)}</p>
+                  <p className="mt-2">
+                    {project.site_lead_external_name ||
+                      getMemberName(project.site_lead_id)}
+                  </p>
                 )}
               </div>
               <div className="mt-6">
