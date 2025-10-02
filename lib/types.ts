@@ -204,6 +204,7 @@ export interface NextJobDetails {
   shift_pattern: string;
   tasks: TaskSummary[];
   colleagues: string[] | null;
+  shift_note: string | null;
 }
 
 export type Competency = { 

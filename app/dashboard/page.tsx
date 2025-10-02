@@ -22,7 +22,7 @@ import {
   MapPin, // Added missing icon
 } from "lucide-react";
 import QuickAccess from "@/components/QuickAccess";
-import { Users } from "lucide-react";
+import { Users, Info } from "lucide-react";
 
 const today = new Date().toISOString().split("T")[0];
 
@@ -57,6 +57,20 @@ const NextJob = ({ job }: { job: NextJobDetails | null }) => {
           <p className="text-sm text-gray-500">{job.shift_pattern} Shift</p>
         </div>
       </div>
+
+      {job.shift_note && (
+        <div className="mt-4 p-3 bg-blue-50 border-l-4 border-blue-400 rounded">
+          <div className="flex items-start">
+            <Info size={20} className="text-blue-600 mr-3 flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold text-blue-800">
+                Important Note for this Shift:
+              </h3>
+              <p className="text-sm text-blue-700 mt-1">{job.shift_note}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 border-t pt-4">
         {job.brief_statement && (
