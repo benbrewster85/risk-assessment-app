@@ -210,6 +210,9 @@ export default async function Dashboard() {
     "get_my_unread_messages_count"
   );
   const { data: nextJob } = await supabase.rpc("get_my_next_job");
+  const { data: myKitAssets } = await supabase.rpc("get_my_kit_bag", {
+    p_date: today,
+  });
 
   // NEW: Fetch data required for the modals
   const { data: userProfile } = await supabase
@@ -221,23 +224,17 @@ export default async function Dashboard() {
 
   const { data: projects } = await supabase
     .from("projects")
-    .select("*")
-    .eq("team_id", teamId);
+    .select("id, name, reference, document_status, last_edited_at")
+    .eq("team_id", teamId)
+    .neq("document_status", "Completed");
   const { data: teamMembers } = await supabase
     .from("profiles")
     .select("*")
     .eq("team_id", teamId);
-  const { data: assets, error: myAssetsError } = await supabase.rpc(
-    "get_my_kit_bag",
-    {
-      p_date: today,
-    }
-  );
-
-  if (myAssetsError) {
-    console.error("Error fetching my kit bag:", myAssetsError);
-    // Handle the error appropriately
-  }
+  const { data: assets } = await supabase
+    .from("assets")
+    .select("*, category:asset_categories(asset_category_class)")
+    .eq("team_id", teamId);
   const { data: vehicles } = await supabase
     .from("vehicles")
     .select("*")
@@ -264,7 +261,7 @@ export default async function Dashboard() {
             <StatusWidgets
               actionItemCount={totalActionItems}
               messageCount={unreadMessagesCount || 0}
-              kitCount={assets?.length || 0}
+              kitCount={myKitAssets?.length || 0}
             />
           </div>
         </div>

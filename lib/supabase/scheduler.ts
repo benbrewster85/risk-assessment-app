@@ -93,7 +93,8 @@ export async function getSchedulableWorkItems(teamId: string): Promise<WorkItem[
   const { data: projects, error: pError } = await supabase
     .from('projects')
     .select('id, name, color')
-    .eq('team_id', teamId);
+    .eq('team_id', teamId)
+    .neq('document_status', 'Completed');
   if (pError) throw pError;
 
   console.log("Fetched projects from database:", projects);

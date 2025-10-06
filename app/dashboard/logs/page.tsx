@@ -48,6 +48,7 @@ export default async function LogsPage() {
       .from("projects")
       .select("id, name")
       .eq("team_id", teamId)
+      .neq("document_status", "Completed")
       .order("name"),
     supabase
       .from("profiles")
@@ -55,9 +56,7 @@ export default async function LogsPage() {
       .eq("team_id", teamId),
     supabase
       .from("assets")
-      .select(
-        "*, asset_categories!assets_category_id_fkey(asset_category_class)"
-      )
+      .select("*, category:asset_categories(asset_category_class)")
       .eq("team_id", teamId),
     supabase
       .from("vehicles")

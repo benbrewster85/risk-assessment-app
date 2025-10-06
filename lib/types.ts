@@ -222,7 +222,20 @@ export type UserCompetency = {
   expiry_date: string | null;
   certificate_file_path: string | null;
   competencies: { name: string }[] | null; 
-  competency: { // Renamed from 'competencies' to singular for clarity
+  competency: { 
     name: string;
   } | null;
+};
+
+export type LibraryItem = { 
+  id: string; 
+  name: string; 
+  is_system_status?: boolean 
+};
+
+export type EnrichedTeamMember = TeamMember & {
+  is_fleet_manager?: boolean;
+  job_role_id?: string | null;
+  sub_team_id?: string | null;
+  line_manager_id?: string | null;
 };

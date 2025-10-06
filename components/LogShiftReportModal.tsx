@@ -70,7 +70,7 @@ export default function LogShiftReportModal({
   );
   const assetOptions = useMemo(() => {
     return assets
-      .filter((a) => a.asset_categories?.asset_category_class === "Primary")
+      .filter((a) => (a as any).category?.asset_category_class === "Primary")
       .map((a) => ({
         value: a.id,
         label: `${a.system_id} - ${a.model}`,

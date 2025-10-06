@@ -1,22 +1,23 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { TeamMember, Team, AssetCategory } from "@/lib/types"; // Make sure to define AbsenceType here
+import {
+  TeamMember,
+  Team,
+  AssetCategory,
+  LibraryItem,
+  EnrichedTeamMember,
+} from "@/lib/types";
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import LibraryPage from "@/components/LibraryPage";
 import { TeamSettingsTab } from "@/components/TeamSettingsTab";
 import OrgChartTab from "@/components/OrgChartTab";
 import CompetencyMatrix from "@/components/CompetencyMatrix";
+import MemberProfileView from "@/components/MemberProfileView";
 
 // Define the shape of team members and library items
-type EnrichedTeamMember = TeamMember & {
-  is_fleet_manager?: boolean;
-  job_role_id?: string | null;
-  sub_team_id?: string | null;
-  line_manager_id?: string | null;
-};
-type LibraryItem = { id: string; name: string; is_system_status?: boolean };
+
 // Define the new AbsenceType based on your schema
 export type AbsenceType = {
   id: string;
@@ -30,7 +31,10 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("members");
 
-  // State from the original multi-tab component
+  // NEW: State to track the selected member's ID
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+
+  // All your other state variables remain the same
   const [team, setTeam] = useState<Team | null>(null);
   const [teamMembers, setTeamMembers] = useState<EnrichedTeamMember[]>([]);
   const [hazards, setHazards] = useState<LibraryItem[]>([]);
@@ -40,7 +44,7 @@ export default function TeamPage() {
   const [competencies, setCompetencies] = useState<LibraryItem[]>([]);
   const [jobRoles, setJobRoles] = useState<LibraryItem[]>([]);
   const [subTeams, setSubTeams] = useState<LibraryItem[]>([]);
-  const [absenceTypes, setAbsenceTypes] = useState<AbsenceType[]>([]); // New state for absence types
+  const [absenceTypes, setAbsenceTypes] = useState<AbsenceType[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -57,7 +61,6 @@ export default function TeamPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-
       if (user) {
         setCurrentUserId(user.id);
         const { data: profiles, error } = await supabase
@@ -241,80 +244,6 @@ export default function TeamPage() {
     setIsInviting(false);
   };
 
-  const handleRoleChange = async (userId: string, newRole: string) => {
-    if (userId === currentUserId) {
-      toast.error("You cannot change your own role.");
-      return;
-    }
-    const { error } = await supabase
-      .from("profiles")
-      .update({ role: newRole })
-      .eq("id", userId);
-    if (error) {
-      toast.error(`Error updating role: ${error.message}`);
-    } else {
-      toast.success("User role updated.");
-      setTeamMembers((currentMembers) =>
-        currentMembers.map((m) =>
-          m.id === userId ? { ...m, role: newRole } : m
-        )
-      );
-    }
-  };
-
-  const handleMemberUpdate = async (
-    userId: string,
-    field: "job_role_id" | "sub_team_id" | "line_manager_id",
-    value: string | null
-  ) => {
-    setTeamMembers((current) =>
-      current.map((m) => (m.id === userId ? { ...m, [field]: value } : m))
-    );
-    const { error } = await supabase
-      .from("profiles")
-      .update({ [field]: value })
-      .eq("id", userId);
-    if (error) {
-      toast.error(`Failed to update user: ${error.message}`);
-    } else {
-      toast.success("User updated successfully.");
-    }
-  };
-
-  const handleFleetManagerChange = async (
-    userId: string,
-    isManager: boolean
-  ) => {
-    if (userId === currentUserId) {
-      toast.error("You cannot change your own permissions.");
-      setTeamMembers((currentMembers) =>
-        currentMembers.map((m) =>
-          m.id === userId ? { ...m, is_fleet_manager: !isManager } : m
-        )
-      );
-      return;
-    }
-    setTeamMembers((currentMembers) =>
-      currentMembers.map((m) =>
-        m.id === userId ? { ...m, is_fleet_manager: isManager } : m
-      )
-    );
-    const { error } = await supabase
-      .from("profiles")
-      .update({ is_fleet_manager: isManager })
-      .eq("id", userId);
-    if (error) {
-      toast.error(`Error updating permission: ${error.message}`);
-      setTeamMembers((currentMembers) =>
-        currentMembers.map((m) =>
-          m.id === userId ? { ...m, is_fleet_manager: !isManager } : m
-        )
-      );
-    } else {
-      toast.success("Fleet Manager permission updated.");
-    }
-  };
-
   if (loading) return <p className="p-8">Loading team data...</p>;
   const isAdmin = currentUserRole === "team_admin";
 
@@ -362,181 +291,66 @@ export default function TeamPage() {
             </div>
 
             <div className="mt-8">
-              {/* --- Members Tab (Restored Content) --- */}
               {activeTab === "members" && (
-                <div className="space-y-8">
-                  <div className="bg-white p-6 rounded-lg shadow">
-                    <h2 className="text-2xl font-bold mb-4">
-                      Invite New Member
-                    </h2>
-                    <form
-                      onSubmit={handleInviteUser}
-                      className="flex items-end space-x-4"
-                    >
-                      <div className="flex-grow">
-                        <label
-                          htmlFor="email"
-                          className="block text-sm font-medium text-gray-700"
-                        >
-                          Email address
-                        </label>
-                        <input
-                          type="email"
-                          id="email"
-                          value={inviteEmail}
-                          onChange={(e) => setInviteEmail(e.target.value)}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                          placeholder="new.member@email.com"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label
-                          htmlFor="role"
-                          className="block text-sm font-medium text-gray-700"
-                        >
-                          Permission
-                        </label>
-                        <select
-                          id="role"
-                          value={inviteRole}
-                          onChange={(e) => setInviteRole(e.target.value)}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                        >
-                          <option value="user">User</option>
-                          <option value="team_admin">Admin</option>
-                        </select>
-                      </div>
-                      <button
-                        type="submit"
-                        disabled={isInviting}
-                        className="py-2 px-4 border rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
-                      >
-                        {isInviting ? "Sending..." : "Send Invite"}
-                      </button>
-                    </form>
-                  </div>
-                  <div className="bg-white p-6 rounded-lg shadow">
-                    <h2 className="text-2xl font-bold mb-4">Current Members</h2>
-                    <ul className="divide-y divide-gray-200">
-                      {teamMembers.map((member) => (
-                        <li
-                          key={member.id}
-                          className="py-4 grid grid-cols-1 md:grid-cols-3 gap-6 items-center"
-                        >
-                          <div>
-                            <p className="font-medium">
-                              {`${member.first_name || ""} ${member.last_name || ""}`.trim() ||
-                                "Unnamed User"}
-                            </p>
-                            <p className="text-sm text-gray-500 capitalize">
-                              {member.role === "team_admin" ? "Admin" : "User"}
-                            </p>
-                          </div>
-                          <div className="grid grid-cols-1 gap-2">
-                            <select
-                              value={member.job_role_id || ""}
-                              onChange={(e) =>
-                                handleMemberUpdate(
-                                  member.id,
-                                  "job_role_id",
-                                  e.target.value || null
-                                )
-                              }
-                              className="block w-full rounded-md border-gray-300 shadow-sm text-sm"
-                              aria-label="Job Role"
-                            >
-                              <option value="">No Job Role</option>
-                              {jobRoles.map((role) => (
-                                <option key={role.id} value={role.id}>
-                                  {role.name}
-                                </option>
-                              ))}
-                            </select>
-                            <select
-                              value={member.sub_team_id || ""}
-                              onChange={(e) =>
-                                handleMemberUpdate(
-                                  member.id,
-                                  "sub_team_id",
-                                  e.target.value || null
-                                )
-                              }
-                              className="block w-full rounded-md border-gray-300 shadow-sm text-sm"
-                              aria-label="Sub-Team"
-                            >
-                              <option value="">No Sub-Team</option>
-                              {subTeams.map((team) => (
-                                <option key={team.id} value={team.id}>
-                                  {team.name}
-                                </option>
-                              ))}
-                            </select>
-                            <select
-                              value={member.line_manager_id || ""}
-                              onChange={(e) =>
-                                handleMemberUpdate(
-                                  member.id,
-                                  "line_manager_id",
-                                  e.target.value || null
-                                )
-                              }
-                              className="block w-full rounded-md border-gray-300 shadow-sm text-sm"
-                              aria-label="Line Manager"
-                            >
-                              <option value="">No Line Manager</option>
-                              {teamMembers
-                                .filter((m) => m.id !== member.id)
-                                .map((manager) => (
-                                  <option key={manager.id} value={manager.id}>
-                                    {`${manager.first_name || ""} ${manager.last_name || ""}`.trim()}
-                                  </option>
-                                ))}
-                            </select>
-                          </div>
-                          <div className="flex items-center justify-end space-x-4">
-                            <div className="flex items-center">
-                              <input
-                                id={`fleet-manager-${member.id}`}
-                                type="checkbox"
-                                className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
-                                checked={!!member.is_fleet_manager}
-                                onChange={(e) =>
-                                  handleFleetManagerChange(
-                                    member.id,
-                                    e.target.checked
-                                  )
-                                }
-                                disabled={member.role === "team_admin"}
-                              />
-                              <label
-                                htmlFor={`fleet-manager-${member.id}`}
-                                className="ml-2 text-sm text-gray-700"
-                              >
-                                Fleet Manager
-                              </label>
-                            </div>
-                            <select
-                              value={member.role}
-                              onChange={(e) =>
-                                handleRoleChange(member.id, e.target.value)
-                              }
-                              className="block w-32 rounded-md border-gray-300 shadow-sm text-sm"
-                              disabled={member.id === currentUserId}
-                              aria-label="Permission Level"
-                            >
-                              <option value="user">User</option>
-                              <option value="team_admin">Admin</option>
-                            </select>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                <div>
+                  {/* Conditionally render list or profile view */}
+                  {selectedMemberId ? (
+                    <MemberProfileView
+                      memberId={selectedMemberId}
+                      onBack={() => setSelectedMemberId(null)}
+                      jobRoles={jobRoles}
+                      allTeamMembers={teamMembers}
+                      subTeams={subTeams}
+                    />
+                  ) : (
+                    <div className="bg-white rounded-lg shadow overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Name
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Role
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Job Title
+                            </th>
+                            <th className="relative px-6 py-3">
+                              <span className="sr-only">View</span>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {teamMembers.map((member) => (
+                            <tr key={member.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button
+                                  onClick={() => setSelectedMemberId(member.id)}
+                                  className="text-indigo-600 hover:underline text-left w-full"
+                                >
+                                  {`${member.first_name || ""} ${member.last_name || ""}`.trim()}
+                                </button>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
+                                {member.role === "team_admin"
+                                  ? "Admin"
+                                  : "User"}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {jobRoles.find(
+                                  (jr) => jr.id === member.job_role_id
+                                )?.name || "N/A"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Library Tab */}
               {activeTab === "library" && team && (
                 <LibraryPage
                   hazards={hazards}
@@ -573,7 +387,6 @@ export default function TeamPage() {
             </div>
           </>
         ) : (
-          // If user is NOT an admin, render only the permission message
           <div className="mt-8">
             <p className="text-red-800 bg-red-100 p-4 rounded-md border border-red-200">
               You do not have administration rights to view or edit this
