@@ -18,11 +18,13 @@ import {
   Truck,
   Calendar,
   Briefcase,
-  ClipboardList, // Added missing icon
-  MapPin, // Added missing icon
+  ClipboardList,
+  MapPin,
+  Users,
+  Info,
 } from "lucide-react";
 import QuickAccess from "@/components/QuickAccess";
-import { Users, Info } from "lucide-react";
+import LatestNews from "@/components/LatestNews";
 
 const today = new Date().toISOString().split("T")[0];
 
@@ -64,7 +66,7 @@ const NextJob = ({ job }: { job: NextJobDetails | null }) => {
             <Info size={20} className="text-blue-600 mr-3 flex-shrink-0" />
             <div>
               <h3 className="font-semibold text-blue-800">
-                Important Note for this Shift:
+                Note for this Shift:
               </h3>
               <p className="text-sm text-blue-700 mt-1">{job.shift_note}</p>
             </div>
@@ -90,7 +92,7 @@ const NextJob = ({ job }: { job: NextJobDetails | null }) => {
         <div className="mt-4 border-t pt-4">
           <h3 className="text-md font-semibold flex items-center">
             <ClipboardList size={16} className="mr-2" />
-            Tasks for this Project:
+            Tasks:
           </h3>
           <ul className="mt-2 space-y-1 text-sm list-disc list-inside">
             {job.tasks.map((task, index) => (
@@ -102,7 +104,6 @@ const NextJob = ({ job }: { job: NextJobDetails | null }) => {
           </ul>
         </div>
       )}
-
       {job.colleagues && job.colleagues.length > 0 && (
         <div className="mt-4 border-t pt-4">
           <h3 className="text-md font-semibold flex items-center">
@@ -114,7 +115,6 @@ const NextJob = ({ job }: { job: NextJobDetails | null }) => {
           </p>
         </div>
       )}
-
       <div className="text-right mt-6">
         <Link
           href={`/dashboard/project/${job.project_id}`}
@@ -227,6 +227,7 @@ export default async function Dashboard() {
     .select("id, name, reference, document_status, last_edited_at")
     .eq("team_id", teamId)
     .neq("document_status", "Completed");
+
   const { data: teamMembers } = await supabase
     .from("profiles")
     .select("*")
@@ -239,6 +240,23 @@ export default async function Dashboard() {
     .from("vehicles")
     .select("*")
     .eq("team_id", teamId);
+
+  const { data: rawNewsData } = await supabase
+    .from("team_news")
+    .select(
+      `id, created_at, title, content, author:profiles (first_name, last_name)`
+    )
+    .eq("team_id", teamId)
+    .order("created_at", { ascending: false })
+    .limit(3);
+
+  // ✅ FIX 2: Transform the news data to match the component's expected type.
+  // The 'author' property is converted from an array to a single object.
+  const latestNews =
+    rawNewsData?.map((item) => ({
+      ...item,
+      author: Array.isArray(item.author) ? item.author[0] : item.author,
+    })) || [];
 
   return (
     <div className="p-8 bg-gray-50 min-h-screen">
@@ -263,6 +281,7 @@ export default async function Dashboard() {
               messageCount={unreadMessagesCount || 0}
               kitCount={myKitAssets?.length || 0}
             />
+            <LatestNews newsItems={latestNews} />
           </div>
         </div>
       </div>
