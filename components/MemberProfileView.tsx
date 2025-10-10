@@ -57,10 +57,11 @@ export default function MemberProfileView({
 
   // --- HANDLER FUNCTIONS RE-INTEGRATED HERE ---
   const handleMemberUpdate = async (
-    field: "job_role_id" | "sub_team_id" | "line_manager_id",
+    field: "job_role_id" | "sub_team_id" | "line_manager_id" | "role",
     value: string | null
   ) => {
     if (!member) return;
+    const originalValue = member[field];
     // Optimistic UI update
     setMember((current) => (current ? { ...current, [field]: value } : null));
 
@@ -71,7 +72,10 @@ export default function MemberProfileView({
 
     if (error) {
       toast.error(`Failed to update user: ${error.message}`);
-      // Revert on error (optional)
+      // Revert on error
+      setMember((current) =>
+        current ? { ...current, [field]: originalValue } : null
+      );
     } else {
       toast.success("User updated successfully.");
     }
@@ -121,6 +125,20 @@ export default function MemberProfileView({
 
         <div className="mt-6 border-t pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* --- EDITING CONTROLS --- */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Role
+            </label>
+            <select
+              value={member.role || ""}
+              onChange={(e) => handleMemberUpdate("role", e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm"
+            >
+              <option value="user">User</option>
+              <option value="team_admin">Admin</option>
+            </select>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Job Role
@@ -177,7 +195,9 @@ export default function MemberProfileView({
                 .filter((m) => m.id !== member.id) // User can't be their own manager
                 .map((manager) => (
                   <option key={manager.id} value={manager.id}>
-                    {`${manager.first_name || ""} ${manager.last_name || ""}`.trim()}
+                    {`${manager.first_name || ""} ${
+                      manager.last_name || ""
+                    }`.trim()}
                   </option>
                 ))}
             </select>

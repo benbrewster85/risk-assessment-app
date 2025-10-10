@@ -240,7 +240,7 @@ export async function createBulkAssignments(
   baseAssignment: Assignment,
   targetResourceType: ResourceType,
   teamId: string
-) {
+): Promise<Assignment[]> { // <-- 1. Update function signature to promise a return value
   const { startDate, endDate, shift, includeWeekends } = formData;
   if (!startDate || !endDate) throw new Error("Missing date range for bulk assign.");
 
@@ -250,6 +250,7 @@ export async function createBulkAssignments(
   let projectId: string | null = null;
   let absenceTypeId: string | null = null;
 
+  // Determine which IDs to use based on the original assignment
   if (baseAssignment.assignmentType === 'project' || baseAssignment.assignmentType === 'absence') {
     if (baseAssignment.assignmentType === 'project') projectId = baseAssignment.workItemId;
     else absenceTypeId = baseAssignment.workItemId;
@@ -262,6 +263,7 @@ export async function createBulkAssignments(
     else if (baseAssignment.assignmentType === 'vehicle') vehicleId = baseAssignment.workItemId;
   }
   
+  // First, delete any existing assignments for this combination in the date range
   const startUTC = new Date(Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()));
   const endUTC = new Date(Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()));
   
@@ -278,7 +280,8 @@ export async function createBulkAssignments(
   const { error: deleteError } = await deleteQuery;
   if (deleteError) throw deleteError;
 
-  const newAssignments: any[] = [];
+  // Next, prepare the new assignments to be inserted
+  const assignmentsToCreate: any[] = [];
   const dataPayload = {
     team_id: teamId,
     personnel_id: personnelId,
@@ -294,19 +297,45 @@ export async function createBulkAssignments(
     if (includeWeekends || (day !== 0 && day !== 6)) {
       const dateString = currentDate.toISOString().split('T')[0];
       if (shift === 'day' || shift === 'both') {
-        newAssignments.push({ ...dataPayload, assignment_date: dateString, shift: 'day' });
+        assignmentsToCreate.push({ ...dataPayload, assignment_date: dateString, shift: 'day' });
       }
       if (shift === 'night' || shift === 'both') {
-        newAssignments.push({ ...dataPayload, assignment_date: dateString, shift: 'night' });
+        assignmentsToCreate.push({ ...dataPayload, assignment_date: dateString, shift: 'night' });
       }
     }
     currentDate.setUTCDate(currentDate.getUTCDate() + 1);
   }
 
-  if (newAssignments.length > 0) {
-  const { error } = await supabase.from('schedule_assignments').insert(newAssignments);
-    if (error) { console.error("Supabase bulk insert error:", error); throw error; }
+  // If there are assignments to create, insert them and return them
+  if (assignmentsToCreate.length === 0) {
+    return []; // Return an empty array if no new assignments were created
   }
+  
+  // ✨ --- KEY CHANGE IS HERE --- ✨
+  const { data: newRawAssignments, error } = await supabase
+    .from('schedule_assignments')
+    .insert(assignmentsToCreate)
+    .select(); // <-- 2. Add .select() to get the new data back
+
+  if (error) { 
+    console.error("Supabase bulk insert error:", error); 
+    throw error; 
+  }
+
+  // 3. Transform the raw database data into the Assignment type for the frontend
+    const formattedAssignments: Assignment[] = (newRawAssignments || []).map((a: any) => ({
+    id: a.id,
+    date: a.assignment_date,
+    shift: a.shift,
+    // Use the IDs we determined earlier for formatting
+    resourceId: (personnelId || assetId || vehicleId)!, // <-- Add '!' here
+    workItemId: (projectId || absenceTypeId || assetId || vehicleId)!, // <-- Add '!' here
+    assignmentType: baseAssignment.assignmentType,
+    duration: 1, // You might want to adjust this if duration is a factor
+  }));
+
+  // 4. Return the newly created and formatted assignments
+  return formattedAssignments;
 }
 
 export async function deleteAssignment(assignmentId: string) {
@@ -322,39 +351,46 @@ export async function deleteAssignment(assignmentId: string) {
 export async function updateAssignment(
   assignmentId: string,
   updates: { resourceId: string; date: string; shift: ShiftType },
-  targetResourceType: ResourceType // <-- Add this new parameter
+  targetResourceType: ResourceType
 ) {
+  // 1. Start with the fields that are always updated: date and shift.
   const updatePayload: { [key: string]: any } = {
     assignment_date: updates.date,
     shift: updates.shift,
-    // Reset all resource type IDs to null before setting the correct one
-    personnel_id: null,
-    asset_id: null,
-    vehicle_id: null,
   };
 
-  // Dynamically set the correct ID based on the resource type
+  // 2. Determine WHICH SINGLE ID column to update and add ONLY that
+  //    column to the payload. This is the critical change.
+  //    We no longer reset the other ID columns to null.
   switch (targetResourceType) {
     case 'personnel':
+      // If we're moving the assignment to a new person, update personnel_id.
+      // The associated asset_id or vehicle_id on the record remains untouched.
       updatePayload.personnel_id = updates.resourceId;
       break;
     case 'equipment':
+      // If we're moving to new equipment, update asset_id.
+      // The associated personnel_id remains untouched.
       updatePayload.asset_id = updates.resourceId;
       break;
     case 'vehicles':
+       // If we're moving to a new vehicle, update vehicle_id.
+       // The associated personnel_id remains untouched.
       updatePayload.vehicle_id = updates.resourceId;
       break;
     default:
-      // Optional: handle an unknown type if necessary
       throw new Error(`Invalid target resource type: ${targetResourceType}`);
   }
 
   const { error } = await supabase
     .from('schedule_assignments')
-    .update(updatePayload)
+    .update(updatePayload) // The payload is now small and targeted.
     .eq('id', assignmentId);
 
-  if (error) throw error;
+  if (error) {
+    console.error("Error updating assignment:", error);
+    throw error;
+  }
 }
 
 // Creates a new day event in the database

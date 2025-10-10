@@ -64,6 +64,8 @@ interface SchedulerGridProps {
   onDeleteDayEvent: (eventId: string) => void;
   onAssignmentClick: (assignment: Assignment) => void;
   activeAssignmentFilters: string[];
+  isFullscreen?: boolean;
+  showNotes: boolean;
 }
 
 interface DroppableCellProps {
@@ -80,6 +82,7 @@ interface DroppableCellProps {
   onAddNote: () => void;
   children: React.ReactNode;
   isReadOnly: boolean;
+  showNotes: boolean;
 }
 
 // --- DROPPABLE CELL COMPONENT ---
@@ -91,6 +94,7 @@ const DroppableCell = ({
   date,
   shift,
   isReadOnly,
+  showNotes,
 }: DroppableCellProps) => {
   const [{ isOver }, drop] = useDrop(() => ({
     accept: ["WORK_ITEM", "ASSIGNMENT_CARD"],
@@ -107,7 +111,7 @@ const DroppableCell = ({
       className={`relative group h-full p-1 flex flex-wrap gap-1 items-start content-start transition-colors ${isOver ? "bg-blue-100" : ""}`}
     >
       {children}
-      {!isReadOnly && (
+      {!isReadOnly && showNotes && (
         <button
           onClick={onAddNote}
           className="absolute bottom-1 right-1 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -126,6 +130,7 @@ export function SchedulerGrid({
   assignments,
   notes,
   workItems,
+  showNotes,
   shiftView,
   viewType,
   dayEvents,
@@ -140,6 +145,7 @@ export function SchedulerGrid({
   onAddDayEvent,
   onDeleteDayEvent,
   onAssignmentClick,
+  isFullscreen,
 }: SchedulerGridProps) {
   const gridTemplateColumns = `200px repeat(${dates.length}, minmax(120px, 1fr))`;
   const rowCount =
@@ -196,28 +202,29 @@ export function SchedulerGrid({
               />
             ) : null;
           })}
-        {notes
-          .filter(
-            (n) =>
-              n.resourceId === resource.id &&
-              n.date === dateString &&
-              n.shift === shift
-          )
-          .map((note) => (
-            <NoteCard
-              key={note.id}
-              note={note}
-              onUpdate={onUpdateNote}
-              onDelete={onDeleteNote}
-              isReadOnly={isReadOnly}
-            />
-          ))}
+        {showNotes &&
+          notes
+            .filter(
+              (n) =>
+                n.resourceId === resource.id &&
+                n.date === dateString &&
+                n.shift === shift
+            )
+            .map((note) => (
+              <NoteCard
+                key={note.id}
+                note={note}
+                onUpdate={onUpdateNote}
+                onDelete={onDeleteNote}
+                isReadOnly={isReadOnly}
+              />
+            ))}
       </>
     );
   };
 
   return (
-    <div className="relative bg-white rounded-lg shadow overflow-x-auto">
+    <div className="relative bg-white rounded-lg shadow overflow-x-auto h-full overflow-y-auto">
       <div className="grid" style={{ gridTemplateColumns, gridTemplateRows }}>
         {/* === HEADER ROW === */}
         <div className="sticky top-0 left-0 z-30 bg-gray-50 border-b border-r border-gray-200 p-2 font-semibold text-sm text-gray-600 flex items-center justify-center">
@@ -391,6 +398,7 @@ export function SchedulerGrid({
                           onAddNote(resource.id, dateString, "day")
                         }
                         isReadOnly={isReadOnly}
+                        showNotes={showNotes}
                       >
                         {renderCellContent("day", dateString, resource)}
                       </DroppableCell>
@@ -429,6 +437,7 @@ export function SchedulerGrid({
                           onAddNote(resource.id, dateString, "night")
                         }
                         isReadOnly={isReadOnly}
+                        showNotes={showNotes}
                       >
                         {renderCellContent("night", dateString, resource)}
                       </DroppableCell>

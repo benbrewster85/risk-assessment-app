@@ -98,7 +98,7 @@ export default function OrgChartTab({ members, jobRoles }: OrgChartTabProps) {
 
   return (
     <div
-      className="bg-gray-50 p-6 rounded-lg shadow"
+      className="bg-gray-50 p-6 rounded-lg shadow "
       style={{ height: "700px" }}
     >
       <h2 className="text-2xl font-bold mb-4">Organisation Chart</h2>

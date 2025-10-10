@@ -35,7 +35,13 @@ import {
 } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronLeft, ChevronRight, Filter as FilterIcon } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Filter as FilterIcon,
+  Maximize,
+  Minimize,
+} from "lucide-react";
 import {
   getSchedulableResources,
   getSchedulableWorkItems,
@@ -89,6 +95,8 @@ export default function SchedulerPage() {
   // --- STATE DECLARATIONS ---
   const [forecasts, setForecasts] = useState<DailyForecast[]>([]);
 
+  const [showNotes, setShowNotes] = useState<boolean>(true);
+
   const [isLoading, setIsLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState<ResourceType>("personnel");
@@ -131,6 +139,8 @@ export default function SchedulerPage() {
     "personnel",
   ]);
 
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   const visibleDates = useMemo(() => {
     const start = new Date(currentDate);
     const dates: Date[] = [];
@@ -141,15 +151,20 @@ export default function SchedulerPage() {
       case "month":
         const year = start.getFullYear();
         const month = start.getMonth();
-        const firstDayOfMonth = new Date(year, month, 1);
-        const lastDayOfMonth = new Date(year, month + 1, 0);
-        let current = new Date(firstDayOfMonth);
-        current.setDate(current.getDate() - current.getDay());
-        while (current <= lastDayOfMonth || current.getDay() !== 0) {
-          // Changed for Sunday start
-          dates.push(new Date(current));
-          current.setDate(current.getDate() + 1);
-          if (dates.length >= 42) break;
+
+        // 1. Create all dates in UTC to avoid local timezone offsets.
+        const firstDayOfMonth = new Date(Date.UTC(year, month, 1));
+        const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0));
+
+        let current = new Date(firstDayOfMonth.valueOf()); // Clone the UTC date
+
+        // 2. Use UTC-specific methods for all calculations.
+        current.setUTCDate(current.getUTCDate() - current.getUTCDay());
+
+        // Loop until the calendar grid is full (usually 42 days for a month view)
+        while (dates.length < 42) {
+          dates.push(new Date(current.valueOf())); // Push a clone of the current UTC date
+          current.setUTCDate(current.getUTCDate() + 1); // Increment by one day in UTC
         }
         break;
       default:
@@ -252,6 +267,12 @@ export default function SchedulerPage() {
   const handleBulkAssign = async (formData: BulkAssignFormData) => {
     if (!selectedAssignment || !teamId)
       return toast.error("Required data is missing.");
+
+    const { startDate, endDate } = formData;
+    if (!startDate || !endDate) {
+      return toast.error("A valid date range is required.");
+    }
+
     const originalResource = allResources.find(
       (r) =>
         r.id === selectedAssignment.resourceId ||
@@ -260,21 +281,60 @@ export default function SchedulerPage() {
     if (!originalResource)
       return toast.error("Could not find the original resource.");
 
-    setIsLoading(true);
+    setIsModalOpen(false);
+
     try {
-      await createBulkAssignments(
+      // 1. Get the new assignments from the backend (this part is unchanged)
+      const newAssignments = await createBulkAssignments(
         formData,
         selectedAssignment,
         originalResource.type,
         teamId
       );
-      toast.success("Assignments updated successfully!");
+
+      // 2. Update the local state in one atomic operation
+      setAssignments((prevAssignments) => {
+        // Create clean date objects for comparison to avoid timezone issues
+        const start = new Date(startDate.toISOString().split("T")[0]);
+        const end = new Date(endDate.toISOString().split("T")[0]);
+
+        // Filter out any old assignments that were just replaced by the bulk operation
+        const filteredAssignments = prevAssignments.filter((a) => {
+          // First, check if it's the same type of assignment (e.g., 'project', 'absence')
+          if (a.assignmentType !== selectedAssignment.assignmentType) {
+            return true; // Keep it, it's not related
+          }
+
+          // Second, check if it involves the same two items.
+          // This is important to distinguish between, for example, a person assigned to a vehicle vs. the same person assigned to a project.
+          const isSamePair =
+            (a.resourceId === selectedAssignment.resourceId &&
+              a.workItemId === selectedAssignment.workItemId) ||
+            (a.resourceId === selectedAssignment.workItemId &&
+              a.workItemId === selectedAssignment.resourceId);
+
+          if (!isSamePair) {
+            return true; // Keep it, it's a different assignment pair
+          }
+
+          // Finally, if it's the same assignment pair, check if its date falls within the range we just overwrote.
+          const assignmentDate = new Date(a.date);
+          const isWithinRange =
+            assignmentDate >= start && assignmentDate <= end;
+
+          // Keep the assignment only if it's *outside* the overwritten range.
+          return !isWithinRange;
+        });
+
+        // 3. Return the newly cleaned list combined with the new assignments from the backend
+        return [...filteredAssignments, ...newAssignments];
+      });
+
+      toast.success("Assignments created successfully!");
     } catch (error) {
       console.error("Bulk assignment failed:", error);
-      toast.error("Failed to update assignments.");
-    } finally {
-      setIsModalOpen(false);
-      await fetchData();
+      toast.error("Failed to create assignments. Please refresh the page.");
+      // In case of an error, a refresh is the safest way to ensure data consistency
     }
   };
 
@@ -429,27 +489,50 @@ export default function SchedulerPage() {
         toast.error("Failed to find target resource.");
         return;
       }
+
+      // ✨ --- NEW LOGIC STARTS HERE --- ✨
+
+      // Determine which field to update based on the current view.
+      const isUpdatingResource = viewType === "personnel";
+
+      const updatedFields = {
+        date: targetDate,
+        shift: targetShift,
+        // Conditionally set either resourceId or workItemId
+        ...(isUpdatingResource
+          ? { resourceId: targetResourceId }
+          : { workItemId: targetResourceId }),
+      };
+
+      // Optimistically update the UI
       setAssignments((prev) =>
         prev.map((a) =>
-          a.id === movedAssignment.id
-            ? {
-                ...a,
-                resourceId: targetResourceId,
-                date: targetDate,
-                shift: targetShift,
-              }
-            : a
+          a.id === movedAssignment.id ? { ...a, ...updatedFields } : a
         )
       );
+
       try {
+        // The backend update function also needs to know what to change.
+        // We'll create a different payload for it.
+        const updatePayload = {
+          date: targetDate,
+          shift: targetShift,
+          // The updateAssignment function expects a 'resourceId' property
+          // that it uses to set the correct db column based on targetResourceType.
+          // So, we send the targetResourceId under that key regardless.
+          resourceId: targetResourceId,
+        };
+
+        // However, we need to tell it WHAT the target is.
+        // If we are in personnel view, the target is a person.
+        // If in equipment/vehicle view, the target is an asset/vehicle.
+        const targetTypeForUpdate =
+          viewType === "all" ? targetResource.type : viewType;
+
         await updateAssignment(
           movedAssignment.id,
-          {
-            resourceId: targetResourceId,
-            date: targetDate,
-            shift: targetShift,
-          },
-          targetResource.type
+          updatePayload,
+          targetTypeForUpdate
         );
       } catch (error) {
         toast.error("Failed to move assignment.");
@@ -524,6 +607,23 @@ export default function SchedulerPage() {
       }
     }
   };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // If the user presses "Escape" while in fullscreen, exit fullscreen
+      if (event.key === "Escape" && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+
+    // Listen for key presses on the window
+    window.addEventListener("keydown", handleKeyDown);
+
+    // Clean up the listener when the component unmounts or re-renders
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isFullscreen]); // The effect depends on the isFullscreen state
 
   // --- MEMOIZED CALCULATIONS & DERIVED STATE ---
   const filteredResources = useMemo(() => {
@@ -656,368 +756,434 @@ export default function SchedulerPage() {
   return (
     <DndProvider backend={HTML5Backend}>
       <CustomDragLayer />
-      <div className="p-8">
+      <div className={!isFullscreen ? "p-8" : ""}>
         <div className="max-w-7xl mx-auto">
-          {/* Page Header */}
-          <div className="flex justify-between items-center mb-8">
-            <div className="flex items-center gap-4">
-              <h1 className="text-3xl font-bold">Work Scheduler</h1>
-              <ToggleGroup
-                type="single"
-                value={timeView}
-                onValueChange={(value: TimeView) => {
-                  if (value) setTimeView(value);
-                }}
-              >
-                <ToggleGroupItem value="day">Day</ToggleGroupItem>
-                <ToggleGroupItem value="week">Week</ToggleGroupItem>
-                <ToggleGroupItem value="month">Month</ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigateTime("prev")}
-              >
-                <ChevronLeft className="w-4 h-4 mr-1" /> Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentDate(new Date())}
-              >
-                Today
-              </Button>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant={"outline"} size="sm">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(currentDate, "PPP")}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={currentDate}
-                    onSelect={(date) => {
-                      if (date) setCurrentDate(date);
+          {!isFullscreen && (
+            <>
+              {/* Page Header */}
+              <div className="flex justify-between items-center mb-8">
+                <div className="flex items-center gap-4">
+                  <h1 className="text-3xl font-bold">Work Scheduler</h1>
+                  <ToggleGroup
+                    type="single"
+                    value={timeView}
+                    onValueChange={(value: TimeView) => {
+                      if (value) setTimeView(value);
                     }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigateTime("next")}
-              >
-                Next <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </div>
-          </div>
-
-          <div className="mb-4 p-4 bg-white rounded-lg shadow border">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-              {/* Column 1 & 2: Drag to Schedule */}
-              <div className="lg:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Drag to Schedule
-                </label>
-                <div className="flex flex-wrap gap-2 items-center">
-                  {!isReadOnly &&
-                    Object.entries(groupedItems).map(([type, items]) => (
-                      <ToolboxPopover
-                        key={type}
-                        title={type}
-                        items={items}
-                        trigger={
-                          <Button variant="outline" size="sm">
-                            {type}
-                          </Button>
-                        }
-                      />
-                    ))}
+                  >
+                    <ToggleGroupItem value="day">Day</ToggleGroupItem>
+                    <ToggleGroupItem value="week">Week</ToggleGroupItem>
+                    <ToggleGroupItem value="month">Month</ToggleGroupItem>
+                  </ToggleGroup>
                 </div>
-              </div>
-
-              {/* Column 3: Resource Type */}
-              <div>
-                <label
-                  htmlFor="viewType"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Resource Type
-                </label>
-                <Select
-                  value={viewType}
-                  onValueChange={(value: ResourceType) => setViewType(value)}
-                >
-                  <SelectTrigger id="viewType" className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Resources</SelectItem>
-                    <SelectItem value="personnel">Personnel</SelectItem>
-                    <SelectItem value="equipment">Equipment</SelectItem>
-                    <SelectItem value="vehicles">Vehicles</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Column 4 & 5: Consolidated Filters */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Filters
-                </label>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigateTime("prev")}
+                  >
+                    <ChevronLeft className="w-4 h-4 mr-1" /> Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentDate(new Date())}
+                  >
+                    Today
+                  </Button>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        disabled={
-                          viewType !== "personnel" && viewType !== "equipment"
-                        }
-                      >
-                        <FilterIcon className="w-4 h-4 mr-2" />
-                        Filter Resources
-                        {activeFilterCount > 0 && (
-                          <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-blue-600 rounded-full">
-                            {activeFilterCount}
-                          </span>
-                        )}
+                      <Button variant={"outline"} size="sm">
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {format(currentDate, "PPP")}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-64 p-4">
-                      {viewType === "personnel" && (
-                        <div className="space-y-4">
-                          {/* Job Role Filter */}
-                          <div className="space-y-2">
-                            <h4 className="font-medium">Job Role</h4>
-                            <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
-                              {filterOptions.jobRoles.map((role) => (
-                                <div
-                                  key={role.id}
-                                  className="flex items-center space-x-2 mb-1"
-                                >
-                                  <Checkbox
-                                    id={`role-${role.id}`}
-                                    checked={activeFilters.jobRoleIds.includes(
-                                      role.id
-                                    )}
-                                    onCheckedChange={() =>
-                                      handleFilterChange("jobRoleIds", role.id)
-                                    }
-                                  />
-                                  <label
-                                    htmlFor={`role-${role.id}`}
-                                    className="text-sm font-medium leading-none"
-                                  >
-                                    {role.name}
-                                  </label>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                          {/* Sub-Team Filter */}
-                          <div className="space-y-2">
-                            <h4 className="font-medium">Sub-Team</h4>
-                            <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
-                              {filterOptions.subTeams.map((team) => (
-                                <div
-                                  key={team.id}
-                                  className="flex items-center space-x-2 mb-1"
-                                >
-                                  <Checkbox
-                                    id={`team-${team.id}`}
-                                    checked={activeFilters.subTeamIds.includes(
-                                      team.id
-                                    )}
-                                    onCheckedChange={() =>
-                                      handleFilterChange("subTeamIds", team.id)
-                                    }
-                                  />
-                                  <label
-                                    htmlFor={`team-${team.id}`}
-                                    className="text-sm font-medium leading-none"
-                                  >
-                                    {team.name}
-                                  </label>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                          {/* Line Manager Filter */}
-                          <div className="space-y-2">
-                            <h4 className="font-medium">Line Manager</h4>
-                            <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
-                              {filterOptions.lineManagers.map((manager) => (
-                                <div
-                                  key={manager.id}
-                                  className="flex items-center space-x-2 mb-1"
-                                >
-                                  <Checkbox
-                                    id={`manager-${manager.id}`}
-                                    checked={activeFilters.lineManagerIds.includes(
-                                      manager.id
-                                    )}
-                                    onCheckedChange={() =>
-                                      handleFilterChange(
-                                        "lineManagerIds",
-                                        manager.id
-                                      )
-                                    }
-                                  />
-                                  <label
-                                    htmlFor={`manager-${manager.id}`}
-                                    className="text-sm font-medium leading-none"
-                                  >
-                                    {manager.name}
-                                  </label>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {viewType === "equipment" && (
-                        <div className="space-y-2">
-                          <h4 className="font-medium">Equipment Type</h4>
-                          <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
-                            {filterOptions.assetCategories.map((cat) => (
-                              <div
-                                key={cat.id}
-                                className="flex items-center space-x-2 mb-1"
-                              >
-                                <Checkbox
-                                  id={`cat-${cat.id}`}
-                                  checked={activeFilters.assetCategoryIds.includes(
-                                    cat.id
-                                  )}
-                                  onCheckedChange={() =>
-                                    handleFilterChange(
-                                      "assetCategoryIds",
-                                      cat.id
-                                    )
-                                  }
-                                />
-                                <label
-                                  htmlFor={`cat-${cat.id}`}
-                                  className="text-sm font-medium leading-none"
-                                >
-                                  {cat.name}
-                                </label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={currentDate}
+                        onSelect={(date) => {
+                          if (date) setCurrentDate(date);
+                        }}
+                        initialFocus
+                      />
                     </PopoverContent>
                   </Popover>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="relative">
-                        <ListFilter className="w-4 h-4 mr-2" />
-                        Filter View
-                        {draggableItemFilters.length < 5 && (
-                          <span className="absolute -top-2 -right-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-blue-600 rounded-full">
-                            {draggableItemFilters.length}
-                          </span>
-                        )}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuLabel>Show Items</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuCheckboxItem
-                        checked={draggableItemFilters.includes("project")}
-                        onCheckedChange={() =>
-                          handleDraggableFilterChange("project")
-                        }
-                      >
-                        Projects
-                      </DropdownMenuCheckboxItem>
-                      <DropdownMenuCheckboxItem
-                        checked={draggableItemFilters.includes("equipment")}
-                        onCheckedChange={() =>
-                          handleDraggableFilterChange("equipment")
-                        }
-                      >
-                        Equipment
-                      </DropdownMenuCheckboxItem>
-                      <DropdownMenuCheckboxItem
-                        checked={draggableItemFilters.includes("vehicle")}
-                        onCheckedChange={() =>
-                          handleDraggableFilterChange("vehicle")
-                        }
-                      >
-                        Vehicles
-                      </DropdownMenuCheckboxItem>
-
-                      <DropdownMenuSeparator />
-                      <DropdownMenuLabel>Shift View</DropdownMenuLabel>
-                      <DropdownMenuRadioGroup
-                        value={shiftView}
-                        onValueChange={(value) =>
-                          setShiftView(value as ShiftView)
-                        }
-                      >
-                        <DropdownMenuRadioItem value="all">
-                          All Shifts
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="day">
-                          Day Only
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="night">
-                          Night Only
-                        </DropdownMenuRadioItem>
-                      </DropdownMenuRadioGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigateTime("next")}
+                  >
+                    Next <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div className="bg-white rounded-lg shadow">
-            {isLoading ? (
-              <div className="p-8 text-center text-gray-500">
-                Loading Scheduler...
+              <div className="mb-4 p-4 bg-white rounded-lg shadow border flex-shrink-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                  {/* Column 1 & 2: Drag to Schedule */}
+                  <div className="lg:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Drag to Schedule
+                    </label>
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {!isReadOnly &&
+                        Object.entries(groupedItems).map(([type, items]) => (
+                          <ToolboxPopover
+                            key={type}
+                            title={type}
+                            items={items}
+                            trigger={
+                              <Button variant="outline" size="sm">
+                                {type}
+                              </Button>
+                            }
+                          />
+                        ))}
+                    </div>
+                  </div>
+
+                  {/* Column 3: Resource Type */}
+                  <div>
+                    <label
+                      htmlFor="viewType"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      Resource Type
+                    </label>
+                    <Select
+                      value={viewType}
+                      onValueChange={(value: ResourceType) =>
+                        setViewType(value)
+                      }
+                    >
+                      <SelectTrigger id="viewType" className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Resources</SelectItem>
+                        <SelectItem value="personnel">Personnel</SelectItem>
+                        <SelectItem value="equipment">Equipment</SelectItem>
+                        <SelectItem value="vehicles">Vehicles</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Column 4 & 5: Consolidated Filters */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Filters
+                    </label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            disabled={
+                              viewType !== "personnel" &&
+                              viewType !== "equipment"
+                            }
+                          >
+                            <FilterIcon className="w-4 h-4 mr-2" />
+                            Filter Resources
+                            {activeFilterCount > 0 && (
+                              <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-blue-600 rounded-full">
+                                {activeFilterCount}
+                              </span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-64 p-4">
+                          {viewType === "personnel" && (
+                            <div className="space-y-4">
+                              {/* Job Role Filter */}
+                              <div className="space-y-2">
+                                <h4 className="font-medium">Job Role</h4>
+                                <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
+                                  {filterOptions.jobRoles.map((role) => (
+                                    <div
+                                      key={role.id}
+                                      className="flex items-center space-x-2 mb-1"
+                                    >
+                                      <Checkbox
+                                        id={`role-${role.id}`}
+                                        checked={activeFilters.jobRoleIds.includes(
+                                          role.id
+                                        )}
+                                        onCheckedChange={() =>
+                                          handleFilterChange(
+                                            "jobRoleIds",
+                                            role.id
+                                          )
+                                        }
+                                      />
+                                      <label
+                                        htmlFor={`role-${role.id}`}
+                                        className="text-sm font-medium leading-none"
+                                      >
+                                        {role.name}
+                                      </label>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              {/* Sub-Team Filter */}
+                              <div className="space-y-2">
+                                <h4 className="font-medium">Sub-Team</h4>
+                                <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
+                                  {filterOptions.subTeams.map((team) => (
+                                    <div
+                                      key={team.id}
+                                      className="flex items-center space-x-2 mb-1"
+                                    >
+                                      <Checkbox
+                                        id={`team-${team.id}`}
+                                        checked={activeFilters.subTeamIds.includes(
+                                          team.id
+                                        )}
+                                        onCheckedChange={() =>
+                                          handleFilterChange(
+                                            "subTeamIds",
+                                            team.id
+                                          )
+                                        }
+                                      />
+                                      <label
+                                        htmlFor={`team-${team.id}`}
+                                        className="text-sm font-medium leading-none"
+                                      >
+                                        {team.name}
+                                      </label>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              {/* Line Manager Filter */}
+                              <div className="space-y-2">
+                                <h4 className="font-medium">Line Manager</h4>
+                                <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
+                                  {filterOptions.lineManagers.map((manager) => (
+                                    <div
+                                      key={manager.id}
+                                      className="flex items-center space-x-2 mb-1"
+                                    >
+                                      <Checkbox
+                                        id={`manager-${manager.id}`}
+                                        checked={activeFilters.lineManagerIds.includes(
+                                          manager.id
+                                        )}
+                                        onCheckedChange={() =>
+                                          handleFilterChange(
+                                            "lineManagerIds",
+                                            manager.id
+                                          )
+                                        }
+                                      />
+                                      <label
+                                        htmlFor={`manager-${manager.id}`}
+                                        className="text-sm font-medium leading-none"
+                                      >
+                                        {manager.name}
+                                      </label>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          {viewType === "equipment" && (
+                            <div className="space-y-2">
+                              <h4 className="font-medium">Equipment Type</h4>
+                              <div className="max-h-40 overflow-y-auto p-2 border rounded-md">
+                                {filterOptions.assetCategories.map((cat) => (
+                                  <div
+                                    key={cat.id}
+                                    className="flex items-center space-x-2 mb-1"
+                                  >
+                                    <Checkbox
+                                      id={`cat-${cat.id}`}
+                                      checked={activeFilters.assetCategoryIds.includes(
+                                        cat.id
+                                      )}
+                                      onCheckedChange={() =>
+                                        handleFilterChange(
+                                          "assetCategoryIds",
+                                          cat.id
+                                        )
+                                      }
+                                    />
+                                    <label
+                                      htmlFor={`cat-${cat.id}`}
+                                      className="text-sm font-medium leading-none"
+                                    >
+                                      {cat.name}
+                                    </label>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </PopoverContent>
+                      </Popover>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="relative"
+                          >
+                            <ListFilter className="w-4 h-4 mr-2" />
+                            Filter View
+                            {draggableItemFilters.length < 5 && (
+                              <span className="absolute -top-2 -right-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-blue-600 rounded-full">
+                                {draggableItemFilters.length}
+                              </span>
+                            )}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuLabel>Show Items</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuCheckboxItem
+                            checked={draggableItemFilters.includes("project")}
+                            onCheckedChange={() =>
+                              handleDraggableFilterChange("project")
+                            }
+                          >
+                            Projects
+                          </DropdownMenuCheckboxItem>
+                          <DropdownMenuCheckboxItem
+                            checked={draggableItemFilters.includes("equipment")}
+                            onCheckedChange={() =>
+                              handleDraggableFilterChange("equipment")
+                            }
+                          >
+                            Equipment
+                          </DropdownMenuCheckboxItem>
+                          <DropdownMenuCheckboxItem
+                            checked={draggableItemFilters.includes("vehicle")}
+                            onCheckedChange={() =>
+                              handleDraggableFilterChange("vehicle")
+                            }
+                          >
+                            Vehicles
+                          </DropdownMenuCheckboxItem>
+                          <DropdownMenuCheckboxItem
+                            checked={draggableItemFilters.includes("absence")}
+                            onCheckedChange={() =>
+                              handleDraggableFilterChange("absence")
+                            }
+                          >
+                            Absences
+                          </DropdownMenuCheckboxItem>
+
+                          <DropdownMenuCheckboxItem
+                            checked={showNotes}
+                            onCheckedChange={setShowNotes} // Directly use the state setter
+                          >
+                            Notes
+                          </DropdownMenuCheckboxItem>
+
+                          <DropdownMenuSeparator />
+                          <DropdownMenuLabel>Shift View</DropdownMenuLabel>
+                          <DropdownMenuRadioGroup
+                            value={shiftView}
+                            onValueChange={(value) =>
+                              setShiftView(value as ShiftView)
+                            }
+                          >
+                            <DropdownMenuRadioItem value="all">
+                              All Shifts
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="day">
+                              Day Only
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="night">
+                              Night Only
+                            </DropdownMenuRadioItem>
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                </div>
               </div>
-            ) : (
-              <SchedulerGrid
-                dates={visibleDates}
-                resources={filteredResources}
-                assignments={assignments}
-                notes={notes}
-                dayEvents={dayEvents}
-                workItems={[
-                  ...allWorkItems,
-                  ...allResources.map((r) => ({
-                    id: r.id,
-                    name: r.name,
-                    type: r.type as any,
-                    color: r.color,
-                  })),
-                ]}
-                shiftView={shiftView}
-                viewType={viewType}
-                onDrop={handleItemDrop}
-                onRemoveAssignment={removeAssignment}
-                onAddNote={handleAddNote}
-                onUpdateNote={handleSaveNote}
-                onDeleteNote={handleDeleteNote}
-                onAddDayEvent={handleAddDayEvent}
-                onDeleteDayEvent={handleDeleteDayEvent}
-                isReadOnly={isReadOnly}
-                onAssignmentClick={handleAssignmentClick}
-                forecasts={forecasts}
-                activeAssignmentFilters={draggableItemFilters}
-              />
-            )}
+            </>
+          )}
+
+          <div className="flex flex-col h-[calc(100vh-18rem)]">
+            <div
+              className={
+                isFullscreen
+                  ? "fixed inset-0 z-50 bg-gray-100 p-4 flex flex-col" // Fullscreen styles
+                  : "relative flex-grow min-h-0" // Normal, relative positioning for the button
+              }
+            >
+              {/* Optional: You can add a new, simpler header for fullscreen mode here if you like */}
+
+              {/* This is your existing div that contains the scheduler. 
+    We add conditional classes to it to make it grow and scroll in fullscreen.
+  */}
+              <div
+                className={`bg-white rounded-lg shadow h-full ${
+                  isFullscreen ? "flex-grow overflow-hidden" : ""
+                }`}
+              >
+                {/* ADD THE MAXIMIZE/MINIMIZE BUTTON HERE */}
+                <button
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="absolute top-2 right-2 z-40 p-1.5 bg-white/70 backdrop-blur-sm rounded-full text-gray-600 hover:text-gray-900 hover:bg-white transition-all"
+                  title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                >
+                  {isFullscreen ? (
+                    <Minimize className="w-5 h-5" />
+                  ) : (
+                    <Maximize className="w-5 h-5" />
+                  )}
+                </button>
+
+                {isLoading ? (
+                  <div className="p-8 text-center text-gray-500">
+                    Loading Scheduler...
+                  </div>
+                ) : (
+                  <SchedulerGrid
+                    isFullscreen={isFullscreen}
+                    dates={visibleDates}
+                    resources={filteredResources}
+                    assignments={assignments}
+                    notes={notes}
+                    dayEvents={dayEvents}
+                    workItems={[
+                      ...allWorkItems,
+                      ...allResources.map((r) => ({
+                        id: r.id,
+                        name: r.name,
+                        type: r.type as any,
+                        color: r.color,
+                      })),
+                    ]}
+                    shiftView={shiftView}
+                    viewType={viewType}
+                    onDrop={handleItemDrop}
+                    onRemoveAssignment={removeAssignment}
+                    onAddNote={handleAddNote}
+                    onUpdateNote={handleSaveNote}
+                    onDeleteNote={handleDeleteNote}
+                    onAddDayEvent={handleAddDayEvent}
+                    onDeleteDayEvent={handleDeleteDayEvent}
+                    isReadOnly={isReadOnly}
+                    onAssignmentClick={handleAssignmentClick}
+                    forecasts={forecasts}
+                    activeAssignmentFilters={draggableItemFilters}
+                    showNotes={showNotes}
+                  />
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
