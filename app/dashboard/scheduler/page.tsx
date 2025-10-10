@@ -600,10 +600,41 @@ export default function SchedulerPage() {
         setAssignments((prev) =>
           prev.map((a) => (a.id === tempId ? savedAssignment : a))
         );
-      } catch (error) {
-        console.error("Failed to save assignment:", error);
-        toast.error("Failed to save assignment.");
+      } catch (error: any) {
+        // Use 'any' to inspect the error object
+        // First, remove the assignment we tried to add optimistically
         setAssignments((prev) => prev.filter((a) => a.id !== tempId));
+
+        // Check if this is the specific "unique constraint" error from the database
+        if (error.code === "23505") {
+          // It's a conflict! Let's find out who has the item.
+          const conflictingAssignment = assignments.find(
+            (a) =>
+              (a.workItemId === workItem.id || a.resourceId === workItem.id) &&
+              a.date === targetDate &&
+              a.shift === targetShift
+          );
+
+          let assigneeName = "another user"; // Default name
+          if (conflictingAssignment) {
+            // The person assigned is the 'resourceId' of that assignment
+            const assignee = allResources.find(
+              (r) => r.id === conflictingAssignment.resourceId
+            );
+            if (assignee) {
+              assigneeName = assignee.name;
+            }
+          }
+
+          // Display the new, prescriptive error message
+          toast.error(
+            `Assignment failed: ${workItem.name} is already assigned to ${assigneeName} on this shift.`
+          );
+        } else {
+          // If it's some other kind of error, show the generic message
+          console.error("Failed to save assignment:", error);
+          toast.error("Failed to save assignment.");
+        }
       }
     }
   };
