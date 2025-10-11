@@ -170,7 +170,7 @@ export default function SplashPage() {
                 Master Your Information
               </h2>
               <p className="mt-4 text-lg text-slate-600">
-                Teams are kept fully up to date, with data at their fingetips.
+                Teams are kept fully up to date, with data at their fingertips.
                 Remove duplication errors and communication barriers - ensure
                 everyone is on the same page, all the time.
               </p>
