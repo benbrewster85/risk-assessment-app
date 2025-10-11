@@ -177,7 +177,7 @@ export default function ProjectDetailsTab({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   readOnly={!isEditing}
-                  rows={1} // Start as a single line
+                  rows={2} // Start as a single line
                   className={`w-full ${!isEditing ? "bg-white resize-none" : "resize-y"}`} // Add resize utility classes
                   style={{ overflow: "hidden" }} // Hides the scrollbar until needed
                 />

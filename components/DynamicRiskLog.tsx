@@ -1,3 +1,4 @@
+// AFTER
 "use client";
 
 import { DynamicRisk } from "@/lib/types";
@@ -6,6 +7,7 @@ import { Edit2, Trash2, AlertTriangle, Check, X } from "react-feather";
 type DynamicRiskLogProps = {
   risks: DynamicRisk[];
   isCurrentUserAdmin: boolean;
+  onLogDynamicRisk: () => void;
   onEdit: (risk: DynamicRisk) => void;
   onDelete: (riskId: number) => void;
 };
@@ -13,12 +15,25 @@ type DynamicRiskLogProps = {
 export default function DynamicRiskLog({
   risks,
   isCurrentUserAdmin,
+  onLogDynamicRisk,
   onEdit,
   onDelete,
 }: DynamicRiskLogProps) {
   return (
     <div className="bg-white p-6 rounded-lg shadow">
-      <h2 className="text-2xl font-bold mb-4">Dynamic Risk Log</h2>
+      {/* The main header and button */}
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold">Dynamic Risk Log</h2>
+        <button
+          onClick={onLogDynamicRisk}
+          className="bg-orange-600 text-white font-bold py-2 px-3 text-sm rounded-lg hover:bg-orange-700 flex items-center"
+        >
+          <AlertTriangle className="h-4 w-4 mr-2" />
+          Log New Risk
+        </button>
+      </div>
+
+      {/* The list of risks, now directly inside the main container */}
       <div className="space-y-4">
         {risks.map((risk) => (
           <div

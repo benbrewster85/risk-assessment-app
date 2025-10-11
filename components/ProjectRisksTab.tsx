@@ -104,24 +104,14 @@ export default function ProjectRisksTab({
       </div>
 
       {/* Section 2: Dynamic Risk Log */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold">Dynamic Risk Log</h2>
-          <button
-            onClick={onLogDynamicRisk}
-            className="bg-orange-600 text-white font-bold py-2 px-3 text-sm rounded-lg hover:bg-orange-700 flex items-center"
-          >
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            Log New Risk
-          </button>
-        </div>
-        <DynamicRiskLog
-          risks={dynamicRisks}
-          isCurrentUserAdmin={isCurrentUserAdmin}
-          onEdit={onEditDynamicRisk}
-          onDelete={onDeleteDynamicRisk}
-        />
-      </div>
+      {/* Section 2: Dynamic Risk Log */}
+      <DynamicRiskLog
+        risks={dynamicRisks}
+        isCurrentUserAdmin={isCurrentUserAdmin}
+        onLogDynamicRisk={onLogDynamicRisk} // Pass this handler down
+        onEdit={onEditDynamicRisk}
+        onDelete={onDeleteDynamicRisk}
+      />
     </div>
   );
 }

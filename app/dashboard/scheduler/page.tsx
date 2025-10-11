@@ -141,44 +141,63 @@ export default function SchedulerPage() {
 
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
+
   const visibleDates = useMemo(() => {
     const start = new Date(currentDate);
     const dates: Date[] = [];
+
+    // Use UTC components for all calculations
+    const year = start.getUTCFullYear();
+    const month = start.getUTCMonth();
+    const day = start.getUTCDate();
+
     switch (timeView) {
       case "day":
-        dates.push(start);
+        // Create a single date at midnight UTC
+        dates.push(new Date(Date.UTC(year, month, day)));
         break;
+
       case "month":
-        const year = start.getFullYear();
-        const month = start.getMonth();
-
-        // 1. Create all dates in UTC to avoid local timezone offsets.
+        // This logic was already correct and remains the same
         const firstDayOfMonth = new Date(Date.UTC(year, month, 1));
-        const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0));
-
-        let current = new Date(firstDayOfMonth.valueOf()); // Clone the UTC date
-
-        // 2. Use UTC-specific methods for all calculations.
+        let current = new Date(firstDayOfMonth.valueOf());
         current.setUTCDate(current.getUTCDate() - current.getUTCDay());
-
-        // Loop until the calendar grid is full (usually 42 days for a month view)
         while (dates.length < 42) {
-          dates.push(new Date(current.valueOf())); // Push a clone of the current UTC date
-          current.setUTCDate(current.getUTCDate() + 1); // Increment by one day in UTC
+          dates.push(new Date(current.valueOf()));
+          current.setUTCDate(current.getUTCDate() + 1);
         }
         break;
-      default:
-        const startOfWeek = new Date(start);
-        startOfWeek.setDate(start.getDate() - start.getDay());
+
+      default: // This is the corrected 'week' view
+        const dayOfWeek = start.getUTCDay(); // 0 for Sunday, 1 for Monday...
+        // Find the start of the week (Sunday) at midnight UTC
+        const startOfWeek = new Date(Date.UTC(year, month, day - dayOfWeek));
+
+        // Create 14 days from that start point, all in UTC
         for (let i = 0; i < 14; i++) {
-          const date = new Date(startOfWeek);
-          date.setDate(startOfWeek.getDate() + i);
+          const date = new Date(startOfWeek.valueOf());
+          date.setUTCDate(startOfWeek.getUTCDate() + i);
           dates.push(date);
         }
         break;
     }
     return dates;
   }, [currentDate, timeView]);
+
+  const fetchSchedulerEvents = useCallback(async () => {
+    if (!teamId) return;
+    // This function ONLY gets assignments, notes, events, and weather.
+    const [schedulerData, weatherData] = await Promise.all([
+      getSchedulerData(teamId),
+      getCachedWeatherForDates(teamId, visibleDates),
+    ]);
+
+    setAssignments(schedulerData.assignments);
+    setNotes(schedulerData.notes);
+    setDayEvents(schedulerData.dayEvents);
+    setForecasts(weatherData);
+  }, [teamId, visibleDates]);
 
   const fetchAndDisplayWeather = useCallback(
     async (teamId: string) => {
@@ -190,8 +209,6 @@ export default function SchedulerPage() {
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
-    setForecasts([]); // Clear old forecast data
-
     try {
       const profile = await getUserProfile();
       if (!profile || !profile.team_id) {
@@ -202,62 +219,38 @@ export default function SchedulerPage() {
       if (!teamId) setTeamId(currentTeamId);
       if (!currentUserRole) setCurrentUserRole(profile.role);
 
-      // --- START: On-Demand Weather Logic ---
-      const { data: teamData } = await supabase
-        .from("teams")
-        .select("weather_last_updated_at")
-        .eq("id", currentTeamId)
-        .single();
-      const lastUpdated = teamData?.weather_last_updated_at
-        ? new Date(teamData.weather_last_updated_at)
-        : null;
-      const todayString = new Date().toISOString().split("T")[0];
-      const lastUpdatedString = lastUpdated
-        ? lastUpdated.toISOString().split("T")[0]
-        : null;
-
-      const isStale = !lastUpdated || todayString !== lastUpdatedString;
-
-      if (isStale) {
-        toast.success("Fetching latest weather forecast...");
-        await fetch("/api/cron/update-weather", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET!}`,
-          },
-          body: JSON.stringify({ teamId: currentTeamId }),
-        });
-      }
-      // --- END: On-Demand Weather Logic ---
-
-      const [resourceData, workItems, schedulerData] = await Promise.all([
+      // Fetch static data
+      const [resourceData, workItems] = await Promise.all([
         getSchedulableResources(currentTeamId),
         getSchedulableWorkItems(currentTeamId),
-        getSchedulerData(currentTeamId),
       ]);
-
       setAllResources(resourceData.resources);
       setFilterOptions(resourceData.filterOptions);
       setAllWorkItems(workItems);
-      setAssignments(schedulerData.assignments);
-      setNotes(schedulerData.notes);
-      setDayEvents(schedulerData.dayEvents);
 
-      await fetchAndDisplayWeather(currentTeamId); // Fetch and display the (now fresh) weather
+      // Call the other function to get the initial set of dynamic data, including weather
+      await fetchSchedulerEvents();
     } catch (error) {
       console.error("Failed to load scheduler data:", error);
       toast.error("Failed to load scheduler data.");
     } finally {
       setIsLoading(false);
+      setIsInitialLoadComplete(true);
     }
-  }, [teamId, currentUserRole, visibleDates, fetchAndDisplayWeather]);
+  }, [teamId, currentUserRole, fetchSchedulerEvents]);
 
   useEffect(() => {
-    setIsLoading(true);
+    // This hook runs only ONCE when the component mounts
     fetchData();
-  }, [fetchData]);
+  }, []); // The empty dependency array is key here
 
+  useEffect(() => {
+    // This hook runs every time the date changes, AFTER the initial load
+    if (!isInitialLoadComplete) return;
+
+    // No "setIsLoading(true)" here, for a smoother feel
+    fetchSchedulerEvents();
+  }, [isInitialLoadComplete, fetchSchedulerEvents]);
   // --- HANDLER FUNCTIONS ---
   const handleAssignmentClick = (assignment: Assignment) => {
     setSelectedAssignment(assignment);
@@ -406,29 +399,58 @@ export default function SchedulerPage() {
   };
 
   const handleSaveNote = async (noteId: string, newText: string) => {
+    // If the note text is empty after trimming, treat it as a deletion
+    if (newText.trim() === "") {
+      handleDeleteNote(noteId); // This correctly calls your existing delete function
+      return;
+    }
+
     const isNewNote = noteId.startsWith("temp-");
-    const noteToSave = notes.find((n) => n.id === noteId);
-    if (!noteToSave) return;
+
     if (isNewNote) {
+      // --- CREATING A NEW NOTE ---
+      const noteToSave = notes.find((n) => n.id === noteId);
+      if (!noteToSave || !teamId) return;
+
       try {
-        if (!teamId) throw new Error("Team ID not found");
-        const { id, ...noteData } = noteToSave;
-        await createNote({ ...noteData, text: newText }, teamId);
-        await fetchData();
+        // Call the backend, which returns the fully formed note with a real ID
+        const savedNote = await createNote(
+          {
+            resourceId: noteToSave.resourceId,
+            date: noteToSave.date,
+            shift: noteToSave.shift,
+            text: newText,
+          },
+          teamId
+        );
+
+        // Update local state by replacing the temporary note with the saved one
+        setNotes((prev) => prev.map((n) => (n.id === noteId ? savedNote : n)));
+        toast.success("Note saved!");
       } catch (error) {
         toast.error("Failed to save note.");
+        // On failure, remove the temporary note from the UI
         setNotes((prev) => prev.filter((n) => n.id !== noteId));
       }
     } else {
-      const previousNotes = notes;
+      // --- UPDATING AN EXISTING NOTE ---
+      const previousNotes = [...notes]; // Keep a copy for potential rollback
+
+      // Optimistically update the UI for an instant feel
       setNotes((prev) =>
         prev.map((n) => (n.id === noteId ? { ...n, text: newText } : n))
       );
+
       try {
-        await updateNote(noteId, newText);
+        // Call the backend, which returns the updated note as the source of truth
+        const updatedNoteFromServer = await updateNote(noteId, newText);
+        // Re-sync the state with the confirmed data from the server
+        setNotes((prev) =>
+          prev.map((n) => (n.id === noteId ? updatedNoteFromServer : n))
+        );
       } catch (error) {
         toast.error("Failed to update note.");
-        setNotes(previousNotes);
+        setNotes(previousNotes); // On failure, roll back to the previous state
       }
     }
   };

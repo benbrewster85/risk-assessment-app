@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+// ✅ 1. Import 'useEffect' from React
+import React, { useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -30,9 +31,17 @@ export function TeamSettingsTab({
   isSubmitting,
   uploading,
 }: TeamSettingsTabProps) {
-  const { register, handleSubmit, setValue } = useForm<Team>({
+  // ✅ 2. Get the 'reset' function from useForm
+  const { register, handleSubmit, setValue, reset } = useForm<Team>({
     defaultValues: team,
   });
+
+  // ✅ 3. Add this useEffect to keep the form's data in sync with the 'team' prop
+  useEffect(() => {
+    if (team) {
+      reset(team);
+    }
+  }, [team, reset]);
 
   const onSubmit = (data: Team) => {
     onUpdateTeam(data);

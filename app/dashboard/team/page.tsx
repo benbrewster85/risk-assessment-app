@@ -15,7 +15,8 @@ import { TeamSettingsTab } from "@/components/TeamSettingsTab";
 import OrgChartTab from "@/components/OrgChartTab";
 import CompetencyMatrix from "@/components/CompetencyMatrix";
 import MemberProfileView from "@/components/MemberProfileView";
-import NewsManagementTab from "@/components/NewsManagementTab"; // ✅ 1. Import the new component
+import NewsManagementTab from "@/components/NewsManagementTab";
+import { useRouter } from "next/navigation";
 // Define the shape of team members and library items
 
 // Define the new AbsenceType based on your schema
@@ -27,6 +28,7 @@ export type AbsenceType = {
 };
 
 export default function TeamPage() {
+  const router = useRouter();
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("members");
@@ -172,22 +174,34 @@ export default function TeamPage() {
 
   // --- HANDLER FUNCTIONS MERGED FROM BOTH FILES ---
 
-  // New handler for updating team settings (name, location)
   const handleUpdateTeam = async (updatedTeamData: Partial<Team>) => {
-    if (!team) return;
-    setIsSubmitting(true);
-    const { error } = await supabase
-      .from("teams")
-      .update(updatedTeamData)
-      .eq("id", team.id);
-
-    if (error) {
-      toast.error(`Failed to update team settings: ${error.message}`);
-    } else {
-      toast.success("Team settings updated successfully.");
-      setTeam((prevTeam) => ({ ...prevTeam!, ...updatedTeamData }));
+    if (!team) {
+      toast.error("Team data not available.");
+      return;
     }
-    setIsSubmitting(false);
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from("teams")
+        .update(updatedTeamData)
+        .eq("id", team.id)
+        .select(); // Keep this .select() call
+
+      if (error) {
+        throw error;
+      }
+
+      toast.success("Team settings updated successfully.");
+      router.refresh();
+      setTeam((prevTeam: Team | null) => ({
+        ...prevTeam!,
+        ...updatedTeamData,
+      }));
+    } catch (error: any) {
+      toast.error(`Update failed: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // New handler for uploading the team logo
