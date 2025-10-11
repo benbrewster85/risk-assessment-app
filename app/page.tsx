@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Shield, BarChart2, List, Tool } from "react-feather";
+import Image from "next/image";
 
 export default function SplashPage() {
   return (
@@ -52,7 +53,7 @@ export default function SplashPage() {
               </p>
               <div className="mt-10">
                 <Link
-                  href="/login"
+                  href="/"
                   className="inline-block bg-blue-600 text-white font-bold text-lg px-8 py-4 rounded-lg shadow-md hover:bg-blue-700 transition-transform transform hover:scale-105"
                 >
                   Get In Touch Today
@@ -138,8 +139,14 @@ export default function SplashPage() {
                 your team aligned.
               </p>
             </div>
-            <div className="w-full h-64 rounded-lg bg-slate-200 shadow-lg flex items-center justify-center">
-              <p className="text-slate-500"></p>
+            <div className="relative w-full h-64 rounded-lg shadow-lg overflow-hidden">
+              <Image
+                src="/images/Zubete1.png"
+                alt="A screenshot of the scheduler page in Zubete"
+                layout="fill"
+                objectFit="cover"
+                objectPosition="bottom"
+              />
             </div>
           </div>
         </div>
@@ -149,17 +156,23 @@ export default function SplashPage() {
       <section id="asset-control" className="py-20 lg:py-24 bg-white">
         <div className="container mx-auto px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="w-full h-64 rounded-lg bg-slate-200 shadow-lg flex items-center justify-center lg:order-last">
-              <p className="text-slate-500"></p>
+            <div className="relative w-full h-64 rounded-lg shadow-lg overflow-hidden">
+              <Image
+                src="/images/Zubete2.png"
+                alt="A screenshot of the next shift section in Zubete"
+                layout="fill"
+                objectFit="cover"
+                objectPosition="top"
+              />
             </div>
             <div className="text-center lg:text-left">
               <h2 className="text-3xl font-bold text-slate-900">
-                Master Your Inventory
+                Master Your Information
               </h2>
               <p className="mt-4 text-lg text-slate-600">
-                Gain a real-time overview of your entire asset inventory.
-                Monitor calibration schedules, track assignee history, and
-                ensure your team has the right tools for the job.
+                Teams are kept fully up to date, with data at their fingetips.
+                Remove duplication errors and communication barriers - ensure
+                everyone is on the same page, all the time.
               </p>
             </div>
           </div>
@@ -174,15 +187,15 @@ export default function SplashPage() {
             Ready to Take Control of Your Operations?
           </h2>
           <p className="mt-4 text-lg text-slate-300 max-w-2xl mx-auto">
-            Sign up today and see how Zubete can transform your team's workflow,
-            safety, and efficiency.
+            Get in touch today for a free demo and see how Zubete can transform
+            your team's efficiency.
           </p>
           <div className="mt-8">
             <Link
-              href="/login"
+              href="/"
               className="inline-block bg-blue-600 text-white font-bold text-lg px-8 py-4 rounded-lg shadow-md hover:bg-blue-700 transition-transform transform hover:scale-105"
             >
-              Sign In or Create Account
+              Escape Excel Hell Now!
             </Link>
           </div>
         </div>
