@@ -19,7 +19,7 @@ export type Project = {
     latitude: number | null;    
     longitude: number | null;  
 };
-export type ProjectListItem = { id: string; name: string; reference: string | null; last_edited_at: string; document_status: string | null; location_address: string | null; latitude: number | null; longitude: number | null; color?: string | null; };
+export type ProjectListItem = { id: string; name: string; reference: string | null; last_edited_at: string; document_status: string | null; location_address: string | null; latitude: number | null; longitude: number | null; color?: string | null; project_manager_id?: string | null; };
 export type Task = { id: string; project_id: string; team_id: string; title: string; description: string | null; status: 'Not Started' | 'In Progress' | 'Completed'; progress: number; sort_order: number; created_at: string; duration_shifts?: number; personnel_count?: number;actual_shifts_logged?: number; };
 export type TeamMember = { id: string; first_name: string | null; last_name: string | null; role: string; is_fleet_manager?: boolean;  };
 export type RiskAssessmentListItem = { id: string; name: string; description: string | null; created_at: string; };

@@ -21,8 +21,8 @@ export default function SplashPage() {
               <Link href="#project-management" className="hover:text-blue-600">
                 Project Management
               </Link>
-              <Link href="#asset-control" className="hover:text-blue-600">
-                Asset Control
+              <Link href="#communication" className="hover:text-blue-600">
+                Focused Communication
               </Link>
             </nav>
             {/* Login Button */}
@@ -153,7 +153,7 @@ export default function SplashPage() {
       </section>
 
       {/* === 3. NEW: Asset Control Section === */}
-      <section id="asset-control" className="py-20 lg:py-24 bg-white">
+      <section id="communication" className="py-20 lg:py-24 bg-white">
         <div className="container mx-auto px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="relative w-full h-64 rounded-lg shadow-lg overflow-hidden">
@@ -227,8 +227,8 @@ export default function SplashPage() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="#asset-control" className="hover:text-white">
-                    Asset Control
+                  <Link href="#communication" className="hover:text-white">
+                    Focused Communication
                   </Link>
                 </li>
               </ul>
