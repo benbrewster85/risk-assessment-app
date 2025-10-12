@@ -11,6 +11,7 @@ import {
   FileText,
   Calendar,
   Icon,
+  Archive,
 } from "react-feather";
 
 // 1. Define a type for your navigation links
@@ -28,6 +29,8 @@ const navLinks: NavLink[] = [
   { name: "Projects", href: "/dashboard/projects", icon: Folder },
   { name: "Logs & Records", href: "/dashboard/logs", icon: FileText },
   { name: "Asset Management", href: "/dashboard/assets", icon: HardDrive },
+  // 2. Add the new link for the Stores section
+  { name: "Stores", href: "/dashboard/stores", icon: Archive },
   { name: "Vehicle Management", href: "/dashboard/vehicles", icon: Truck },
   { name: "Team Management", href: "/dashboard/team", icon: Users },
 ];

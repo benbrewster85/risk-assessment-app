@@ -239,3 +239,70 @@ export type EnrichedTeamMember = TeamMember & {
   sub_team_id?: string | null;
   line_manager_id?: string | null;
 };
+
+export type StoreLocation = {
+  id: string;
+  team_id: string;
+  name: string;
+  description: string | null;
+};
+
+export type StoreCategory = {
+  id: string;
+  team_id: string;
+  name: string;
+};
+
+export type StoreProduct = {
+  id: string;
+  team_id: string;
+  category_id: string;
+  name: string;
+  description: string | null;
+  store_categories: StoreCategory; 
+};
+
+export type InventoryItem = {
+  id: string;
+  team_id: string;
+  product_id: string;
+  location_id: string;
+  variant_name: string;
+  unit_of_measure: string;
+  quantity_on_hand: number;
+  reorder_level: number;
+  sku: string | null;
+  store_products: StoreProduct; 
+  store_locations: StoreLocation; 
+};
+
+// This is a comprehensive type for the nested structure we'll use in the UI
+export type CategoryWithProducts = StoreCategory & {
+  products: (StoreProduct & {
+    items: InventoryItem[];
+  })[];
+};
+
+export type OrderRequest = {
+    id: string;
+    team_id: string;
+    requested_by_id: string;
+    inventory_item_id: string | null;
+    item_description: string | null;
+    quantity: number;
+    notes: string | null;
+    status: 'pending' | 'approved' | 'ordered' | 'received' | 'rejected';
+    created_at: string;
+    // Joined profile data
+    profiles: {
+        first_name: string | null;
+        last_name: string | null;
+    } | null;
+    // Joined item data
+    inventory_items: {
+      variant_name: string;
+      store_products: {
+        name: string;
+      }
+    } | null;
+};

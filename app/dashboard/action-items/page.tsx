@@ -2,7 +2,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import ActionItems from "@/components/ActionItems";
-import { Asset, AssetIssue, Vehicle, VehicleEvent } from "@/lib/types";
+import {
+  Asset,
+  AssetIssue,
+  Vehicle,
+  VehicleEvent,
+  OrderRequest,
+  InventoryItem,
+} from "@/lib/types";
 
 // A type to match the JSON structure from our new SQL function
 type ActionItemsData = {
@@ -10,6 +17,8 @@ type ActionItemsData = {
   open_vehicle_issues: VehicleEvent[];
   assets_requiring_calibration: Asset[];
   vehicles_requiring_mot: Vehicle[];
+  pending_order_requests: OrderRequest[];
+  low_stock_items: InventoryItem[];
 };
 
 export default async function ActionItemsPage() {
@@ -35,6 +44,8 @@ export default async function ActionItemsPage() {
     open_vehicle_issues: [],
     assets_requiring_calibration: [],
     vehicles_requiring_mot: [],
+    pending_order_requests: [],
+    low_stock_items: [],
   };
 
   return (
@@ -46,6 +57,8 @@ export default async function ActionItemsPage() {
           vehicleIssues={actionItems.open_vehicle_issues}
           assetsForCalibration={actionItems.assets_requiring_calibration}
           vehiclesForMot={actionItems.vehicles_requiring_mot}
+          pendingOrders={actionItems.pending_order_requests}
+          lowStockItems={actionItems.low_stock_items}
         />
       </div>
     </div>

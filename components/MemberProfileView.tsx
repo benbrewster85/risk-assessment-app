@@ -10,6 +10,7 @@ import { toast } from "react-hot-toast";
 type LibraryItem = { id: string; name: string };
 type EnrichedTeamMember = TeamMember & {
   is_fleet_manager?: boolean;
+  is_storesperson?: boolean;
   job_role_id?: string | null;
   sub_team_id?: string | null;
   line_manager_id?: string | null;
@@ -102,6 +103,27 @@ export default function MemberProfileView({
     }
   };
 
+  const handleStorespersonChange = async (isStoresperson: boolean) => {
+    if (!member) return;
+    setMember((current) =>
+      current ? { ...current, is_storesperson: isStoresperson } : null
+    );
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ is_storesperson: isStoresperson })
+      .eq("id", member.id);
+
+    if (error) {
+      toast.error(`Error updating permission: ${error.message}`);
+      setMember((current) =>
+        current ? { ...current, is_storesperson: !isStoresperson } : null
+      );
+    } else {
+      toast.success("Storesperson permission updated.");
+    }
+  };
+
   if (loading) return <p>Loading member profile...</p>;
   if (!member) return <p>Could not load member profile.</p>;
 
@@ -124,7 +146,6 @@ export default function MemberProfileView({
         </p>
 
         <div className="mt-6 border-t pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* --- EDITING CONTROLS --- */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Role
@@ -192,15 +213,30 @@ export default function MemberProfileView({
             >
               <option value="">No Line Manager</option>
               {allTeamMembers
-                .filter((m) => m.id !== member.id) // User can't be their own manager
+                .filter((m) => m.id !== member.id)
                 .map((manager) => (
                   <option key={manager.id} value={manager.id}>
-                    {`${manager.first_name || ""} ${
-                      manager.last_name || ""
-                    }`.trim()}
+                    {`${manager.first_name || ""} ${manager.last_name || ""}`.trim()}
                   </option>
                 ))}
             </select>
+          </div>
+
+          <div className="flex items-center">
+            <input
+              id="storesperson"
+              type="checkbox"
+              className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
+              checked={!!member.is_storesperson}
+              onChange={(e) => handleStorespersonChange(e.target.checked)}
+              disabled={member.role === "team_admin"}
+            />
+            <label
+              htmlFor="storesperson"
+              className="ml-2 text-sm text-gray-700"
+            >
+              Storesperson
+            </label>
           </div>
 
           <div className="flex items-center">

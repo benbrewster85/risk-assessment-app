@@ -1,8 +1,21 @@
 "use client";
 
-import { Asset, AssetIssue, Vehicle, VehicleEvent } from "@/lib/types";
+import {
+  Asset,
+  AssetIssue,
+  Vehicle,
+  VehicleEvent,
+  OrderRequest,
+  InventoryItem,
+} from "@/lib/types";
 import Link from "next/link";
-import { AlertTriangle, CheckCircle, MessageSquare, Tool } from "react-feather"; // FIXED: Wrench is now Tool
+import {
+  AlertTriangle,
+  CheckCircle,
+  MessageSquare,
+  Tool,
+  ShoppingCart,
+} from "react-feather";
 import type { Icon as IconType } from "react-feather";
 
 // This function remains the same
@@ -85,11 +98,15 @@ export default function ActionItems({
   vehicleIssues,
   assetsForCalibration,
   vehiclesForMot,
+  pendingOrders,
+  lowStockItems,
 }: {
   assetIssues: AssetIssue[];
   vehicleIssues: VehicleEvent[];
   assetsForCalibration: Asset[];
   vehiclesForMot: Vehicle[];
+  pendingOrders: OrderRequest[];
+  lowStockItems: InventoryItem[];
 }) {
   // Process the pre-filtered arrays
   const calibrationAlerts = assetsForCalibration.map((asset) => ({
@@ -106,6 +123,8 @@ export default function ActionItems({
   if (
     assetIssues.length === 0 &&
     vehicleIssues.length === 0 &&
+    pendingOrders.length === 0 &&
+    lowStockItems.length === 0 &&
     calibrationAlerts.filter(
       (a) => a.status === "Overdue" || a.status === "Due Soon"
     ).length === 0 &&
@@ -177,6 +196,79 @@ export default function ActionItems({
                     {/* FIXED: Use (issue as any).vehicle_id to bypass type error */}
                     <Link
                       href={`/dashboard/vehicles/${(issue as any).vehicle_id}`}
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      View &rarr;
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {pendingOrders.length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold mb-2">
+              Pending Order Requests
+            </h3>
+            <div className="space-y-4">
+              {pendingOrders.map((order) => (
+                <div
+                  key={order.id}
+                  className="border-t pt-4 first:pt-0 first:border-t-0"
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center">
+                      <ShoppingCart className="h-5 w-5 mr-3 text-blue-600" />
+                      <div>
+                        <p className="font-semibold">
+                          New order requested by{" "}
+                          {`${(order as any).first_name || ""} ${(order as any).last_name || ""}`.trim() ||
+                            "N/A"}
+                        </p>
+                        <p className="text-sm text-blue-600 font-bold">
+                          Awaiting Action
+                        </p>
+                      </div>
+                    </div>
+                    <Link
+                      href={`/dashboard/stores/manage?tab=orders`} // Links to the page with the "Orders" tab
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      View &rarr;
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {lowStockItems.length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold mb-2">Low Stock Alerts</h3>
+            <div className="space-y-4">
+              {lowStockItems.map((item: any) => (
+                <div
+                  key={item.id}
+                  className="border-t pt-4 first:pt-0 first:border-t-0"
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center">
+                      <AlertTriangle className="h-5 w-5 mr-3 text-amber-600" />
+                      <div>
+                        <p className="font-semibold">
+                          {item.product_name} - {item.variant_name}
+                        </p>
+                        <p className="text-sm text-amber-600 font-bold">
+                          Stock at {item.quantity_on_hand} (Reorder at{" "}
+                          {item.reorder_level})
+                        </p>
+                      </div>
+                    </div>
+                    <Link
+                      href={`/dashboard/stores/manage`} // Link to the management page
                       className="text-sm text-blue-600 hover:underline"
                     >
                       View &rarr;

@@ -203,7 +203,9 @@ export default async function Dashboard() {
     (actionItemsData?.open_asset_issues?.length || 0) +
     (actionItemsData?.open_vehicle_issues?.length || 0) +
     (actionItemsData?.assets_requiring_calibration?.length || 0) +
-    (actionItemsData?.vehicles_requiring_mot?.length || 0);
+    (actionItemsData?.vehicles_requiring_mot?.length || 0) +
+    (actionItemsData?.pending_order_requests?.length || 0) +
+    (actionItemsData?.low_stock_items?.length || 0);
 
   // Fetch other widget data
   const { data: unreadMessagesCount } = await supabase.rpc(
