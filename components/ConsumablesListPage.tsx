@@ -3,10 +3,11 @@
 "use client";
 
 import { useState, useMemo } from "react";
+// FIX 1: Add the missing type imports
 import {
-  CategoryWithProducts,
   InventoryItem,
   StoreLocation,
+  CategoryWithProducts,
   StoreProduct,
 } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,8 +35,6 @@ import {
 import { CheckOutModal } from "./modals/CheckOutModal";
 import { RequestOrderModal } from "./modals/RequestOrderModal";
 
-// FIX: Moved this type definition outside of the component
-// so it can be used in the Props interface.
 type GroupedData = {
   location: StoreLocation;
   categories: Map<string, CategoryWithProducts>;
@@ -52,6 +51,8 @@ export function ConsumablesListPage({ initialData, allLocations }: Props) {
   );
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+
+  // FIX 2: Re-add the missing state variables for the modals
   const [isCheckOutModalOpen, setCheckOutModalOpen] = useState(false);
   const [isRequestOrderModalOpen, setRequestOrderModalOpen] = useState(false);
 
@@ -62,22 +63,16 @@ export function ConsumablesListPage({ initialData, allLocations }: Props) {
   const filteredCategories = useMemo(() => {
     if (!activeLocationData) return [];
 
-    // Get categories as a standard array with the correct type
     const categoriesArray: CategoryWithProducts[] = Array.from(
       activeLocationData.categories.values()
     );
-
     if (!searchTerm) return categoriesArray;
 
     const lowercasedFilter = searchTerm.toLowerCase();
-
-    // FIX: Add explicit type `CategoryWithProducts` to the `category` parameter
     const filtered = categoriesArray
       .map((category: CategoryWithProducts) => {
-        // FIX: Add explicit type to the `product` parameter
         const filteredProducts = category.products.filter(
           (product: StoreProduct & { items: InventoryItem[] }) => {
-            // FIX: Add explicit type to the `item` parameter
             const hasMatchingItem = product.items.some(
               (item: InventoryItem) =>
                 item.variant_name.toLowerCase().includes(lowercasedFilter) ||
@@ -91,7 +86,6 @@ export function ConsumablesListPage({ initialData, allLocations }: Props) {
             );
           }
         );
-        // FIX: The spread operator now works because `category` is a known object type
         return { ...category, products: filteredProducts };
       })
       .filter((category) => category.products.length > 0);
@@ -104,7 +98,8 @@ export function ConsumablesListPage({ initialData, allLocations }: Props) {
     setCheckOutModalOpen(true);
   };
 
-  const handleRequestOrder = (item: InventoryItem) => {
+  const handleRequestOrder = (item: InventoryItem | null) => {
+    // Allow null for non-stock item
     setSelectedItem(item);
     setRequestOrderModalOpen(true);
   };
@@ -114,11 +109,11 @@ export function ConsumablesListPage({ initialData, allLocations }: Props) {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      {/* ... rest of the JSX is the same as before ... */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Store Consumables</h1>
-        <Button onClick={() => setRequestOrderModalOpen(true)}>
+    <>
+      {/* The main page title has been moved to the layout file. */}
+      {/* This div now just holds page-specific actions. */}
+      <div className="flex justify-end mb-4">
+        <Button onClick={() => handleRequestOrder(null)}>
           <ShoppingCart className="mr-2 h-4 w-4" /> Request Non-Stock Item
         </Button>
       </div>
@@ -155,12 +150,10 @@ export function ConsumablesListPage({ initialData, allLocations }: Props) {
           <CardContent>
             {filteredCategories.length > 0 ? (
               <Accordion type="multiple" className="w-full">
-                {/* FIX: Add explicit type for `category` here as well */}
                 {filteredCategories.map((category: CategoryWithProducts) => (
                   <AccordionItem key={category.id} value={category.id}>
                     <AccordionTrigger>{category.name}</AccordionTrigger>
                     <AccordionContent>
-                      {/* FIX: Add explicit type for `product` */}
                       {category.products.map(
                         (
                           product: StoreProduct & { items: InventoryItem[] }
@@ -168,7 +161,6 @@ export function ConsumablesListPage({ initialData, allLocations }: Props) {
                           <div key={product.id} className="ml-4">
                             <h4 className="font-semibold">{product.name}</h4>
                             <ul className="list-disc pl-5">
-                              {/* FIX: Add explicit type for `item` */}
                               {product.items.map((item: InventoryItem) => (
                                 <li
                                   key={item.id}
@@ -286,6 +278,6 @@ export function ConsumablesListPage({ initialData, allLocations }: Props) {
           setSelectedItem(null);
         }}
       />
-    </div>
+    </>
   );
 }

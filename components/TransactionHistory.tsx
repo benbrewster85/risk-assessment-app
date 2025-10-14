@@ -116,7 +116,11 @@ export function TransactionHistory({ transactions }: Props) {
                     {t.inventory_items?.variant_name}
                   </div>
                 </TableCell>
-                <TableCell>{t.profiles?.first_name || "System"}</TableCell>
+                <TableCell>
+                  {t.profiles
+                    ? `${t.profiles.first_name || ""} ${t.profiles.last_name || ""}`.trim()
+                    : "System"}
+                </TableCell>
                 <TableCell>
                   <Badge variant="secondary">
                     {t.transaction_type.replace("_", " ")}
