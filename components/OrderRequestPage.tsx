@@ -20,8 +20,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, PlusCircle } from "lucide-react"; // 1. Import PlusCircle icon
 import toast from "react-hot-toast";
+import { RequestOrderModal } from "./modals/RequestOrderModal"; // 2. Import the modal
 
 interface Props {
   initialOrders: OrderRequest[];
@@ -30,6 +31,7 @@ interface Props {
 export function OrderRequestPage({ initialOrders = [] }: Props) {
   const [isPending, startTransition] = useTransition();
   const [filter, setFilter] = useState<"pending" | "all">("pending");
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false); // 3. Add state for the create modal
 
   const filteredOrders = useMemo(() => {
     if (filter === "all") {
@@ -84,95 +86,122 @@ export function OrderRequestPage({ initialOrders = [] }: Props) {
   };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Order Requests</CardTitle>
-        <div className="space-x-2">
-          <Button
-            variant={filter === "pending" ? "default" : "outline"}
-            onClick={() => setFilter("pending")}
-          >
-            Pending Actions
-          </Button>
-          <Button
-            variant={filter === "all" ? "default" : "outline"}
-            onClick={() => setFilter("all")}
-          >
-            All Orders
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Item</TableHead>
-              <TableHead>Requested By</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredOrders.map((order) => (
-              <TableRow key={order.id}>
-                <TableCell>
-                  <div className="font-medium">
-                    {order.inventory_items
-                      ? `${order.inventory_items.store_products.name} - ${order.inventory_items.variant_name}`
-                      : order.item_description}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Qty: {order.quantity}
-                  </div>
-                </TableCell>
-                {/* FIX: Combine first and last name for the full name */}
-                <TableCell>
-                  {order.profiles
-                    ? `${order.profiles.first_name || ""} ${order.profiles.last_name || ""}`.trim()
-                    : "N/A"}
-                </TableCell>
-                <TableCell>
-                  {new Date(order.created_at).toLocaleDateString()}
-                </TableCell>
-                <TableCell>{getStatusBadge(order.status)}</TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" disabled={isPending}>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem
-                        onClick={() => handleStatusChange(order.id, "approved")}
-                      >
-                        Approve
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleStatusChange(order.id, "ordered")}
-                      >
-                        Mark as Ordered
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleStatusChange(order.id, "received")}
-                      >
-                        Mark as Received
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-red-600"
-                        onClick={() => handleStatusChange(order.id, "rejected")}
-                      >
-                        Reject
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+    <>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Order Requests</CardTitle>
+          {/* 4. Group the buttons together */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant={filter === "pending" ? "default" : "outline"}
+              onClick={() => setFilter("pending")}
+            >
+              Pending Actions
+            </Button>
+            <Button
+              variant={filter === "all" ? "default" : "outline"}
+              onClick={() => setFilter("all")}
+            >
+              All Orders
+            </Button>
+            <Button onClick={() => setIsCreateModalOpen(true)}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Create Order
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Item</TableHead>
+                <TableHead>Requested By</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+            </TableHeader>
+            <TableBody>
+              {filteredOrders.map((order) => (
+                <TableRow key={order.id}>
+                  <TableCell>
+                    <div className="font-medium">
+                      {order.inventory_items
+                        ? `${order.inventory_items.store_products.name} - ${order.inventory_items.variant_name}`
+                        : order.item_description}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Qty: {order.quantity}
+                    </div>
+                  </TableCell>
+                  {/* FIX: Combine first and last name for the full name */}
+                  <TableCell>
+                    {order.profiles
+                      ? `${order.profiles.first_name || ""} ${order.profiles.last_name || ""}`.trim()
+                      : "N/A"}
+                  </TableCell>
+                  <TableCell>
+                    {new Date(order.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>{getStatusBadge(order.status)}</TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          disabled={isPending}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            handleStatusChange(order.id, "approved")
+                          }
+                        >
+                          Approve
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            handleStatusChange(order.id, "ordered")
+                          }
+                        >
+                          Mark as Ordered
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            handleStatusChange(order.id, "received")
+                          }
+                        >
+                          Mark as Received
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-red-600"
+                          onClick={() =>
+                            handleStatusChange(order.id, "rejected")
+                          }
+                        >
+                          Reject
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* 5. Render the modal for creating a new order */}
+      {isCreateModalOpen && (
+        <RequestOrderModal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          item={null} // We pass null because this is for a new order, not tied to a specific item initially
+        />
+      )}
+    </>
   );
 }

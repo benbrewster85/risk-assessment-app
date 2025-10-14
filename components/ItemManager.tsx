@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation"; // 1. Import useRouter
+import { createClient } from "@/lib/supabase/client"; // 2. Import Supabase client
 import {
   InventoryItem,
   StoreLocation,
@@ -18,7 +20,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Edit, PlusCircle, Trash } from "lucide-react";
-import { ItemModal } from "../components/modals/ItemModal";
+import { ItemModal } from "./modals/ItemModal";
+import { ConfirmDeleteDialog } from "./modals/ConfirmDeleteDialog"; // 3. Import the new dialog
+import toast from "react-hot-toast"; // 4. Import toast
 
 interface Props {
   items: InventoryItem[];
@@ -28,8 +32,11 @@ interface Props {
 }
 
 export function ItemManager({ items, locations, categories, products }: Props) {
+  const router = useRouter();
+  const supabase = createClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null); // 5. Add state for the delete confirmation
 
   const handleEdit = (item: InventoryItem) => {
     setSelectedItem(item);
@@ -41,11 +48,22 @@ export function ItemManager({ items, locations, categories, products }: Props) {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (item: InventoryItem) => {
-    // You can add delete logic here, similar to the LibraryManager
-    alert(
-      `Delete functionality for ${item.store_products.name} - ${item.variant_name} is not yet implemented.`
-    );
+  // 6. This is the function that runs when the user confirms deletion in the dialog
+  const handleDeleteConfirm = async () => {
+    if (!itemToDelete) return;
+
+    const { error } = await supabase
+      .from("inventory_items")
+      .delete()
+      .eq("id", itemToDelete.id);
+
+    if (error) {
+      toast.error(`Failed to delete item: ${error.message}`);
+    } else {
+      toast.success("Item deleted successfully.");
+      router.refresh();
+    }
+    setItemToDelete(null); // Close the dialog
   };
 
   return (
@@ -92,10 +110,11 @@ export function ItemManager({ items, locations, categories, products }: Props) {
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
+                    {/* 7. The delete button now opens the confirmation dialog */}
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleDelete(item)}
+                      onClick={() => setItemToDelete(item)}
                     >
                       <Trash className="h-4 w-4 text-red-500" />
                     </Button>
@@ -117,6 +136,15 @@ export function ItemManager({ items, locations, categories, products }: Props) {
           products={products}
         />
       )}
+
+      {/* 8. Render the confirmation dialog */}
+      <ConfirmDeleteDialog
+        isOpen={!!itemToDelete}
+        onClose={() => setItemToDelete(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Inventory Item"
+        description={`Are you sure you want to delete "${itemToDelete?.store_products.name} - ${itemToDelete?.variant_name}"? This action cannot be undone and will also remove all associated transaction history.`}
+      />
     </>
   );
 }
