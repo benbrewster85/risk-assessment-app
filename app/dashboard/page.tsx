@@ -219,7 +219,7 @@ export default async function Dashboard() {
   // NEW: Fetch data required for the modals
   const { data: userProfile } = await supabase
     .from("profiles")
-    .select("team_id")
+    .select("first_name, team_id")
     .eq("id", user.id)
     .single();
   const teamId = userProfile?.team_id || "";
@@ -263,7 +263,11 @@ export default async function Dashboard() {
   return (
     <div className="p-8 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+        <h1 className="text-3xl font-bold mb-6">
+          {userProfile?.first_name
+            ? `${userProfile.first_name}'s Dashboard`
+            : "Dashboard"}
+        </h1>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
             {/* Use the new component and pass props to it */}
