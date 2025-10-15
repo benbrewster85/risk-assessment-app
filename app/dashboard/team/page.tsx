@@ -323,49 +323,109 @@ export default function TeamPage() {
                       subTeams={subTeams}
                     />
                   ) : (
-                    <div className="bg-white rounded-lg shadow overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                              Name
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                              Role
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                              Job Title
-                            </th>
-                            <th className="relative px-6 py-3">
-                              <span className="sr-only">View</span>
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {teamMembers.map((member) => (
-                            <tr key={member.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <button
-                                  onClick={() => setSelectedMemberId(member.id)}
-                                  className="text-indigo-600 hover:underline text-left w-full"
-                                >
-                                  {`${member.first_name || ""} ${member.last_name || ""}`.trim()}
-                                </button>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
-                                {member.role === "team_admin"
-                                  ? "Admin"
-                                  : "User"}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {jobRoles.find(
-                                  (jr) => jr.id === member.job_role_id
-                                )?.name || "N/A"}
-                              </td>
+                    <div className="space-y-8">
+                      {/* Invite New Member Form */}
+                      <div className="bg-white p-6 rounded-lg shadow">
+                        <h2 className="text-2xl font-bold mb-4">
+                          Invite New Member
+                        </h2>
+                        <form
+                          onSubmit={handleInviteUser}
+                          className="flex flex-col sm:flex-row sm:items-end sm:space-x-4 space-y-4 sm:space-y-0"
+                        >
+                          <div className="flex-grow">
+                            <label
+                              htmlFor="email"
+                              className="block text-sm font-medium text-gray-700"
+                            >
+                              Email address
+                            </label>
+                            <input
+                              type="email"
+                              id="email"
+                              value={inviteEmail}
+                              onChange={(e) => setInviteEmail(e.target.value)}
+                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                              placeholder="new.member@email.com"
+                              required
+                            />
+                          </div>
+                          <div className="w-full sm:w-auto">
+                            <label
+                              htmlFor="role"
+                              className="block text-sm font-medium text-gray-700"
+                            >
+                              Permission
+                            </label>
+                            <select
+                              id="role"
+                              value={inviteRole}
+                              onChange={(e) => setInviteRole(e.target.value)}
+                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                            >
+                              <option value="user">User</option>
+                              <option value="team_admin">Admin</option>
+                            </select>
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={isInviting}
+                            className="w-full sm:w-auto px-4 py-2 border rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isInviting ? "Sending..." : "Send Invite"}
+                          </button>
+                        </form>
+                      </div>
+
+                      {/* Current Members List */}
+                      <div className="bg-white rounded-lg shadow overflow-x-auto">
+                        <h2 className="text-2xl font-bold p-6">
+                          Current Members
+                        </h2>
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                Name
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                Role
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                Job Title
+                              </th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {teamMembers.map((member) => (
+                              <tr key={member.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                  <button
+                                    onClick={() =>
+                                      setSelectedMemberId(member.id)
+                                    }
+                                    className="text-indigo-600 hover:underline text-left w-full"
+                                  >
+                                    {`${member.first_name || ""} ${
+                                      member.last_name || ""
+                                    }`.trim()}
+                                  </button>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
+                                  {member.role === "team_admin"
+                                    ? "Admin"
+                                    : "User"}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {jobRoles.find(
+                                    (jr) => jr.id === member.job_role_id
+                                  )?.name || "N/A"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
                 </div>
